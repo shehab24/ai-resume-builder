@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Users, Briefcase, Mail, Calendar, ExternalLink } from "lucide-react";
@@ -42,7 +42,6 @@ export default function CandidatesPage() {
             const response = await fetch("/api/recruiter/jobs");
             if (response.ok) {
                 const data = await response.json();
-                // API returns an array of jobs directly
                 setJobs(data);
             }
         } catch (error) {
@@ -98,104 +97,109 @@ export default function CandidatesPage() {
                     </CardContent>
                 </Card>
             ) : (
-                <div className="grid gap-6 lg:grid-cols-3">
-                    {/* Jobs List */}
-                    <div className="lg:col-span-1 space-y-4">
-                        <h2 className="text-xl font-semibold">Your Job Postings</h2>
-                        {jobs.map((job) => (
-                            <Card
-                                key={job.id}
-                                className={`cursor-pointer transition-all hover:shadow-md ${selectedJob === job.id ? "border-primary border-2" : ""
-                                    }`}
-                                onClick={() => fetchApplications(job.id)}
-                            >
-                                <CardContent className="p-4">
-                                    <h3 className="font-semibold truncate">{job.title}</h3>
-                                    <p className="text-sm text-muted-foreground truncate">{job.company}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">{job.location}</p>
-                                    <div className="flex items-center justify-between mt-3">
-                                        <Badge variant="secondary" className="flex items-center gap-1">
-                                            <Users className="h-3 w-3" />
-                                            {job.applicantCount} applicants
-                                        </Badge>
-                                        <span className="text-xs text-muted-foreground">
-                                            {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "N/A"}
-                                        </span>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Job List - Left Side */}
+                    <div className="lg:col-span-1 space-y-3">
+                        <h2 className="text-lg font-semibold">Your Jobs</h2>
+                        <div className="space-y-2">
+                            {jobs.map((job) => (
+                                <Card
+                                    key={job.id}
+                                    className={`cursor-pointer transition-all hover:shadow-md ${selectedJob === job.id ? "border-primary bg-primary/5" : ""
+                                        }`}
+                                    onClick={() => fetchApplications(job.id)}
+                                >
+                                    <CardHeader className="p-4">
+                                        <CardTitle className="text-base line-clamp-1">{job.title}</CardTitle>
+                                        <div className="flex items-center justify-between mt-2">
+                                            <Badge variant="outline" className="text-xs">
+                                                <Users className="h-3 w-3 mr-1" />
+                                                {job.applicantCount} applicants
+                                            </Badge>
+                                            <span className="text-xs text-muted-foreground">
+                                                {new Date(job.createdAt).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    </CardHeader>
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Applications - Right Side */}
+                    <div className="lg:col-span-2">
+                        {!selectedJob ? (
+                            <Card className="h-full">
+                                <CardContent className="flex items-center justify-center h-64">
+                                    <div className="text-center text-muted-foreground">
+                                        <Briefcase className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                        <p>Select a job to view applications</p>
                                     </div>
                                 </CardContent>
                             </Card>
-                        ))}
-                    </div>
-
-                    {/* Applications List */}
-                    <div className="lg:col-span-2">
-                        {!selectedJob ? (
-                            <Card>
-                                <CardContent className="py-12 text-center">
-                                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                                    <h3 className="text-lg font-semibold mb-2">Select a Job</h3>
-                                    <p className="text-muted-foreground">Click on a job posting to view its applications</p>
+                        ) : loadingApplications ? (
+                            <Card className="h-full">
+                                <CardContent className="flex items-center justify-center h-64">
+                                    <Loader2 className="h-8 w-8 animate-spin" />
                                 </CardContent>
                             </Card>
-                        ) : loadingApplications ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 className="h-8 w-8 animate-spin" />
-                            </div>
                         ) : applications.length === 0 ? (
-                            <Card>
-                                <CardContent className="py-12 text-center">
-                                    <Mail className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                                    <h3 className="text-lg font-semibold mb-2">No Applications Yet</h3>
-                                    <p className="text-muted-foreground">This job hasn't received any applications</p>
+                            <Card className="h-full">
+                                <CardContent className="flex items-center justify-center h-64">
+                                    <div className="text-center text-muted-foreground">
+                                        <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                        <p>No applications yet for this job</p>
+                                    </div>
                                 </CardContent>
                             </Card>
                         ) : (
-                            <div className="space-y-4">
-                                <h2 className="text-xl font-semibold">Applications ({applications.length})</h2>
-                                {applications.map((application) => (
-                                    <Card key={application.id}>
-                                        <CardHeader>
-                                            <div className="flex items-start justify-between">
-                                                <div>
-                                                    <CardTitle className="text-lg">{application.user.name || "Anonymous"}</CardTitle>
-                                                    <CardDescription className="flex items-center gap-2 mt-1">
-                                                        <Mail className="h-3 w-3" />
-                                                        {application.user.email}
-                                                    </CardDescription>
-                                                </div>
-                                                <Badge
-                                                    variant={
-                                                        application.status === "PENDING"
-                                                            ? "secondary"
-                                                            : application.status === "REVIEWED"
-                                                                ? "default"
-                                                                : application.status === "INTERVIEW"
+                            <div className="space-y-3">
+                                <h2 className="text-lg font-semibold">Applications ({applications.length})</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {applications.map((application) => (
+                                        <Card key={application.id} className="hover:shadow-md transition-shadow">
+                                            <CardHeader className="p-4">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex-1 min-w-0">
+                                                        <CardTitle className="text-base truncate">
+                                                            {application.user.name || "Anonymous"}
+                                                        </CardTitle>
+                                                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                                            <Mail className="h-3 w-3" />
+                                                            <span className="truncate">{application.user.email}</span>
+                                                        </div>
+                                                    </div>
+                                                    <Badge
+                                                        variant={
+                                                            application.status === "PENDING"
+                                                                ? "secondary"
+                                                                : application.status === "HIRED"
                                                                     ? "default"
-                                                                    : application.status === "HIRED"
-                                                                        ? "default"
-                                                                        : "destructive"
-                                                    }
-                                                >
-                                                    {application.status}
-                                                </Badge>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                    <Calendar className="h-4 w-4" />
-                                                    Applied on {new Date(application.createdAt).toLocaleDateString()}
+                                                                    : "outline"
+                                                        }
+                                                        className="shrink-0"
+                                                    >
+                                                        {application.status}
+                                                    </Badge>
                                                 </div>
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/dashboard/recruiter/applications/${application.id}`}>
-                                                        View Details
-                                                        <ExternalLink className="ml-2 h-4 w-4" />
-                                                    </Link>
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
+                                            </CardHeader>
+                                            <CardContent className="p-4 pt-0">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                                        <Calendar className="h-3 w-3" />
+                                                        {new Date(application.createdAt).toLocaleDateString()}
+                                                    </div>
+                                                    <Button size="sm" variant="ghost" asChild>
+                                                        <Link href={`/dashboard/recruiter/applications/${application.id}`}>
+                                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                                            View
+                                                        </Link>
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>

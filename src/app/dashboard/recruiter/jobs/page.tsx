@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Briefcase, MapPin, DollarSign, Trash2, Pencil } from "lucide-react";
+import { Loader2, Briefcase, MapPin, DollarSign, Trash2, Pencil, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
     AlertDialog,
@@ -111,61 +111,73 @@ export default function RecruiterJobsPage() {
     }
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6 p-4">
+        <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Your Posted Jobs</h1>
+                <h1 className="text-3xl font-bold">My Jobs</h1>
                 <Button onClick={() => router.push("/dashboard/recruiter/jobs/create")}>
                     <Briefcase className="mr-2 h-4 w-4" />
                     Post New Job
                 </Button>
             </div>
 
-            {jobs.map((job) => (
-                <Card key={job.id}>
-                    <CardHeader className="flex flex-col space-y-2">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <CardTitle className="text-xl">{job.title}</CardTitle>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                    Posted on {new Date(job.createdAt).toLocaleDateString()}
-                                </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {jobs.map((job) => (
+                    <Card key={job.id} className="hover:shadow-lg transition-shadow">
+                        <CardHeader className="pb-3">
+                            <div className="flex justify-between items-start gap-2">
+                                <CardTitle className="text-lg line-clamp-2">{job.title}</CardTitle>
+                                <Badge variant="outline" className="shrink-0">
+                                    <Users className="h-3 w-3 mr-1" />
+                                    {job.applicantCount || 0}
+                                </Badge>
                             </div>
-                            <div className="flex gap-2">
-                                <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/recruiter/jobs/${job.id}/edit`)}>
-                                    <Pencil className="h-4 w-4 mr-1" /> Edit
+                            <p className="text-xs text-muted-foreground">
+                                {new Date(job.createdAt).toLocaleDateString()}
+                            </p>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="flex flex-col gap-1 text-sm">
+                                {job.location && (
+                                    <span className="flex items-center text-muted-foreground">
+                                        <MapPin className="mr-1 h-3 w-3" /> {job.location}
+                                    </span>
+                                )}
+                                {job.salary && (
+                                    <span className="flex items-center text-muted-foreground">
+                                        <DollarSign className="mr-1 h-3 w-3" /> {job.salary}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                                {job.requirements.slice(0, 3).map((req, i) => (
+                                    <Badge key={i} variant="secondary" className="text-xs">{req}</Badge>
+                                ))}
+                                {job.requirements.length > 3 && (
+                                    <Badge variant="secondary" className="text-xs">+{job.requirements.length - 3}</Badge>
+                                )}
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1"
+                                    onClick={() => router.push(`/dashboard/recruiter/jobs/${job.id}/edit`)}
+                                >
+                                    <Pencil className="h-3 w-3 mr-1" /> Edit
                                 </Button>
-                                <Button variant="destructive" size="sm" onClick={() => handleDeleteClick(job.id)}>
-                                    <Trash2 className="h-4 w-4 mr-1" /> Delete
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="flex-1"
+                                    onClick={() => handleDeleteClick(job.id)}
+                                >
+                                    <Trash2 className="h-3 w-3 mr-1" /> Delete
                                 </Button>
                             </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <div className="flex gap-4 text-sm">
-                            {job.location && (
-                                <span className="flex items-center">
-                                    <MapPin className="mr-1 h-4 w-4" /> {job.location}
-                                </span>
-                            )}
-                            {job.salary && (
-                                <span className="flex items-center">
-                                    <DollarSign className="mr-1 h-4 w-4" /> {job.salary}
-                                </span>
-                            )}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {job.requirements.map((req, i) => (
-                                <Badge key={i} variant="secondary">{req}</Badge>
-                            ))}
-                        </div>
-                        <div className="pt-2">
-                            <Badge variant="outline">
-                                {job.applicantCount || 0} Applicants
-                            </Badge>
-                        </div>
-                    </CardContent>
-                </Card>
-            ))}
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
 
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>

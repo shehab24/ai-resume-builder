@@ -25,6 +25,12 @@ export default function RecruiterLayout({
                         </Link>
                     </Button>
                     <Button variant="ghost" className="w-full justify-start" asChild>
+                        <Link href="/dashboard/recruiter/jobs">
+                            <Briefcase className="mr-2 h-4 w-4" />
+                            My Jobs
+                        </Link>
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start" asChild>
                         <Link href="/dashboard/recruiter/jobs/create">
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Post a Job

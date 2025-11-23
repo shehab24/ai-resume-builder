@@ -150,6 +150,7 @@ export default function ApplicationDetailsPage() {
                                     <SelectContent>
                                         <SelectItem value="PENDING">Pending</SelectItem>
                                         <SelectItem value="REVIEWED">Reviewed</SelectItem>
+                                        <SelectItem value="SHORTLISTED">Shortlisted</SelectItem>
                                         <SelectItem value="INTERVIEW">Interview</SelectItem>
                                         <SelectItem value="HIRED">Hired</SelectItem>
                                         <SelectItem value="REJECTED">Rejected</SelectItem>

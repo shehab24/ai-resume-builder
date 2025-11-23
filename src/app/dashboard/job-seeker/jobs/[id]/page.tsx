@@ -200,23 +200,6 @@ export default function JobDetailsPage() {
                             </ul>
                         </section>
                     )}
-
-                    {job.tasks && job.tasks.length > 0 && (
-                        <section className="bg-muted/50 p-4 rounded-lg border">
-                            <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                                <Briefcase className="h-5 w-5" />
-                                Application Process
-                            </h3>
-                            <p className="text-sm text-muted-foreground mb-2">
-                                This job requires completing {job.tasks.length} task{job.tasks.length > 1 ? 's' : ''} as part of the application.
-                            </p>
-                            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                                {job.tasks.map((task, index) => (
-                                    <li key={index} className="truncate">{task}</li>
-                                ))}
-                            </ul>
-                        </section>
-                    )}
                 </CardContent>
             </Card>
         </div>
