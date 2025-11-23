@@ -1,65 +1,115 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { ArrowRight, FileText, Briefcase, CheckCircle } from "lucide-react";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 
-export default function Home() {
+export default async function Home() {
+  const { userId } = await auth();
+  const dashboardLink = userId ? "/dashboard/job-seeker" : "/sign-in"; // Default to job seeker, middleware/onboarding handles role check ideally
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="flex flex-col min-h-screen">
+      {/* Header */}
+      <header className="px-6 lg:px-12 h-16 flex items-center justify-between border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="flex items-center gap-2 font-bold text-xl text-primary">
+          <FileText className="h-6 w-6" />
+          <span>ResumeAI</span>
+        </div>
+        <nav className="hidden md:flex gap-6 text-sm font-medium">
+          <Link href="#features" className="hover:text-primary transition-colors">Features</Link>
+          <Link href="#how-it-works" className="hover:text-primary transition-colors">How it Works</Link>
+          <Link href="#pricing" className="hover:text-primary transition-colors">Pricing</Link>
+        </nav>
+        <div className="flex items-center gap-4">
+          <SignedOut>
+            <Button variant="ghost" asChild>
+              <Link href="/sign-in">Log In</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/sign-up">Get Started</Link>
+            </Button>
+          </SignedOut>
+          <SignedIn>
+            <Button variant="ghost" asChild>
+              <Link href="/onboarding">Dashboard</Link>
+            </Button>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="py-20 px-6 lg:px-12 text-center bg-gradient-to-b from-white to-gray-50">
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
+            Build Your Dream Resume with AI
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+            Create professional resumes in seconds, get matched with top jobs, and let our AI agent apply for you.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <SignedOut>
+              <Button size="lg" className="text-lg px-8 h-12" asChild>
+                <Link href="/sign-up">
+                  Create My Resume <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" className="text-lg px-8 h-12" asChild>
+                <Link href="/sign-in">I'm a Recruiter</Link>
+              </Button>
+            </SignedOut>
+            <SignedIn>
+              <Button size="lg" className="text-lg px-8 h-12" asChild>
+                <Link href="/onboarding">
+                  Go to Dashboard <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+            </SignedIn>
+          </div>
+        </section>
+
+        {/* Features Section */}
+        <section id="features" className="py-20 px-6 lg:px-12 bg-white">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-12">Why Choose ResumeAI?</h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              <div className="p-6 rounded-xl bg-gray-50 border hover:shadow-lg transition-shadow">
+                <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4 text-primary">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">AI Resume Builder</h3>
+                <p className="text-muted-foreground">
+                  Generate tailored resumes instantly with our advanced AI. Just tell us about yourself.
+                </p>
+              </div>
+              <div className="p-6 rounded-xl bg-gray-50 border hover:shadow-lg transition-shadow">
+                <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4 text-primary">
+                  <Briefcase className="h-6 w-6" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Smart Job Matching</h3>
+                <p className="text-muted-foreground">
+                  Get matched with jobs that fit your skills and experience perfectly.
+                </p>
+              </div>
+              <div className="p-6 rounded-xl bg-gray-50 border hover:shadow-lg transition-shadow">
+                <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4 text-primary">
+                  <CheckCircle className="h-6 w-6" />
+                </div>
+                <h3 className="text-xl font-bold mb-2">Auto-Apply Agent</h3>
+                <p className="text-muted-foreground">
+                  Let our AI agent apply to jobs on your behalf while you sleep.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
+
+      {/* Footer */}
+      <footer className="py-8 px-6 lg:px-12 border-t text-center text-sm text-muted-foreground">
+        <p>&copy; {new Date().getFullYear()} ResumeAI. All rights reserved.</p>
+      </footer>
     </div>
   );
 }

@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  JOB_SEEKER
+  RECRUITER
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  clerkId   String   @unique
+  email     String   @unique
+  name      String?
+  role      Role     @default(JOB_SEEKER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Job Seeker relations
+  resumes      Resume[]
+  applications Application[]
+
+  // Recruiter relations
+  // Recruiter relations
+  postedJobs Job[]
+  
+  notifications Notification[]
+}
+
+model Notification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String   // "APPLICATION_RECEIVED", "STATUS_UPDATE", "TASK_ASSIGNED"
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Resume {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  content   String // JSON string or structured data
+  pdfUrl    String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Job {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  recruiterId      String   @db.ObjectId
+  recruiter        User     @relation(fields: [recruiterId], references: [id])
+  
+  // Basic Info
+  title            String
+  description      String
+  requirements     String[]
+  
+  // Professional Fields
+  company          String?
+  location         String?
+  jobType          String?  // Full-time, Part-time, Contract, Internship
+  workMode         String?  // Remote, Hybrid, On-site
+  experienceLevel  String?  // Entry, Mid, Senior, Lead
+  
+  // Compensation
+  salaryMin        Int?
+  salaryMax        Int?
+  salaryCurrency   String?  @default("USD")
+  
+  // Additional Details
+  benefits         String[] // Health insurance, 401k, etc.
+  applicationDeadline DateTime?
+  
+  // Tasks for applicants
+  tasks            String[] // Array of task descriptions
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  applications     Application[]
+}
+
+model Application {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  jobId        String   @db.ObjectId
+  job          Job      @relation(fields: [jobId], references: [id])
+  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id])
+  status       String   @default("PENDING") // PENDING, REVIEWED, INTERVIEW, REJECTED, HIRED
+  
+  // Task submissions
+  taskSubmissions String[] // Array of task submission URLs or text
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

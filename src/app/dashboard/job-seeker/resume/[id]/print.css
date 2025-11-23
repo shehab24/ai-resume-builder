@@ -1,0 +1,31 @@
+/* Print styles for resume PDF export */
+@media print {
+    /* Hide everything except the resume */
+    body > div:first-child,
+    header,
+    aside,
+    nav,
+    .print\:hidden {
+        display: none !important;
+    }
+    
+    /* Show only the resume card */
+    #resume-card {
+        display: block !important;
+        box-shadow: none !important;
+        border: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Ensure resume card is visible */
+    #resume-card,
+    #resume-card * {
+        visibility: visible !important;
+    }
+    
+    /* Reset page margins for PDF */
+    @page {
+        margin: 0.5in;
+    }
+}
