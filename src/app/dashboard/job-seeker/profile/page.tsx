@@ -41,6 +41,7 @@ export default function ProfilePage() {
         matchThreshold: 95,
         autoApplyCountry: "",
     });
+
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -333,7 +334,6 @@ export default function ProfilePage() {
                                         checked={profile.autoApply}
                                         onChange={(e) => setProfile({ ...profile, autoApply: e.target.checked })}
                                         className="w-12 h-6 rounded-full appearance-none cursor-pointer bg-gray-300 checked:bg-blue-600 relative transition-colors
-                                                   before:content-[''] before:absolute before:w-5 before:h-5 before:rounded-full before:bg-white 
                                                    before:content-[''] before:absolute before:w-5 before:h-5 before:rounded-full before:bg-white
                                                    before:top-0.5 before:left-0.5 before:transition-transform checked:before:translate-x-6"
                                     />

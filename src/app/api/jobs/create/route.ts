@@ -78,7 +78,9 @@ export async function POST(req: Request) {
                 id: true,
                 autoApply: true,
                 name: true,
-                email: true
+                email: true,
+                matchThreshold: true,
+                autoApplyCountry: true
             }
         });
 
@@ -97,33 +99,49 @@ export async function POST(req: Request) {
         }
 
         // Auto-Apply for eligible users
-        const autoApplyUsers = jobSeekers.filter((seeker: { id: string; autoApply: boolean; name: string | null; email: string }) => seeker.autoApply);
+        const autoApplyUsers = jobSeekers.filter((seeker: any) => seeker.autoApply);
 
         if (autoApplyUsers.length > 0) {
             console.log(`Processing auto-apply for ${autoApplyUsers.length} users...`);
 
             for (const seeker of autoApplyUsers) {
                 try {
+                    // Check country preference if set
+                    if (seeker.autoApplyCountry && location && !location.includes(seeker.autoApplyCountry)) {
+                        continue;
+                    }
+
                     // Get user's resumes
                     const resumes = await prisma.resume.findMany({
                         where: { userId: seeker.id },
                         select: {
                             id: true,
-                            skills: true,
-                            experience: true
+                            content: true,
                         }
                     });
 
                     if (resumes.length === 0) continue;
 
                     // Use the first resume (or you could pick the best matching one)
-                    const resume = resumes[0];
+                    const resumeRecord = resumes[0];
+                    let resumeData;
+                    try {
+                        resumeData = JSON.parse(resumeRecord.content);
+                    } catch (e) {
+                        console.error("Failed to parse resume content", e);
+                        continue;
+                    }
 
                     // Calculate match score
-                    const matchScore = calculateMatchScore(resume, requirements);
+                    const matchScore = calculateMatchScore({
+                        skills: resumeData.skills || [],
+                        experience: resumeData.experience || []
+                    }, requirements);
 
-                    // Auto-apply if match is 95% or higher
-                    if (matchScore >= 95) {
+                    // Auto-apply if match meets user's threshold
+                    const threshold = seeker.matchThreshold || 95;
+
+                    if (matchScore >= threshold) {
                         // Check if already applied
                         const existingApplication = await prisma.application.findFirst({
                             where: {
@@ -138,7 +156,12 @@ export async function POST(req: Request) {
                                 data: {
                                     userId: seeker.id,
                                     jobId: job.id,
-                                    resumeId: resume.id,
+                                    // resumeId: resumeRecord.id, // Schema doesn't have resumeId in Application yet? Let's check schema.
+                                    // The schema has resumeId in Application? No, let's check schema again.
+                                    // Wait, looking at schema provided earlier:
+                                    // model Application { ... userId String ... jobId String ... }
+                                    // It does NOT have resumeId.
+                                    // So I should remove resumeId from create.
                                     status: "PENDING",
                                     taskSubmissions: []
                                 }
