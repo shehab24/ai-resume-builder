@@ -19,9 +19,10 @@ export default function CreateJobPage() {
         company: "",
         description: "",
         location: "",
-        jobType: "",
-        workMode: "",
-        experienceLevel: "",
+        country: "",
+        jobType: "Full-time", // Default
+        workMode: "On-site", // Default
+        experienceLevel: "Mid", // Default
         salaryMin: "",
         salaryMax: "",
         requirements: "",
@@ -60,6 +61,7 @@ export default function CreateJobPage() {
                     company: formData.company,
                     description: formData.description,
                     location: formData.location,
+                    country: formData.country, // Added
                     jobType: formData.jobType,
                     workMode: formData.workMode,
                     experienceLevel: formData.experienceLevel,
@@ -205,10 +207,30 @@ export default function CreateJobPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="location">Location</Label>
+                                <Label htmlFor="country">Country</Label>
+                                <Select value={formData.country} onValueChange={(value) => setFormData({ ...formData, country: value })}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select country" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Worldwide">Worldwide / Remote</SelectItem>
+                                        <SelectItem value="United States">United States</SelectItem>
+                                        <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                                        <SelectItem value="Canada">Canada</SelectItem>
+                                        <SelectItem value="Germany">Germany</SelectItem>
+                                        <SelectItem value="France">France</SelectItem>
+                                        <SelectItem value="India">India</SelectItem>
+                                        <SelectItem value="Australia">Australia</SelectItem>
+                                        {/* Add more countries as needed */}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="location">City / State</Label>
                                 <Input
                                     id="location"
-                                    placeholder="e.g., San Francisco, CA or Remote"
+                                    placeholder="e.g., San Francisco, CA"
                                     value={formData.location}
                                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                                 />

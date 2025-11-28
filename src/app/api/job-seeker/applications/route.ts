@@ -18,7 +18,14 @@ export async function GET() {
         }
 
         const applications = await prisma.application.findMany({
-            where: { userId: user.id },
+            where: {
+                userId: user.id,
+                job: {
+                    recruiterId: {
+                        not: user.id // Hide applications to own jobs (if any exist from before)
+                    }
+                }
+            },
             include: {
                 job: {
                     select: {

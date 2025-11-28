@@ -37,14 +37,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             }
         });
 
+        // Check if this is the user's own job posting
+        const isOwnJob = job.recruiterId === user.id;
+
         // Build a salary string if min/max are present
         const salary = job.salaryMin && job.salaryMax ? `${job.salaryMin}-${job.salaryMax}` : job.salaryMin || job.salaryMax || undefined;
 
         const response = {
             id: job.id,
             title: job.title,
+            company: job.company, // Added company field
             description: job.description,
             location: job.location,
+            country: job.country, // Added
             salary,
             requirements: job.requirements,
             recruiter: job.recruiter,
@@ -54,7 +59,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             benefits: job.benefits,
             applicationDeadline: job.applicationDeadline,
             tasks: job.tasks,
-            hasApplied: !!existingApplication // Add this flag
+            hasApplied: !!existingApplication, // Add this flag
+            isOwnJob: isOwnJob // Add this flag to indicate if user posted this job
         };
 
         return NextResponse.json(response);

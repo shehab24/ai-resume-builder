@@ -32,19 +32,41 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         }
 
         const applications = await prisma.application.findMany({
-            where: { jobId: id },
+            where: {
+                jobId: id,
+                userId: {
+                    not: user.id // Exclude self-applications
+                }
+            },
             include: {
                 user: {
                     select: {
                         name: true,
                         email: true,
+                        photoUrl: true,
                     },
                 },
             },
-            orderBy: { createdAt: "desc" },
+            orderBy: [
+                { compositeScore: 'desc' }, // Sort by AI score first
+                { createdAt: 'desc' }       // Then by date
+            ],
         });
 
-        return NextResponse.json({ applications });
+        // Separate top candidates
+        const topCandidates = applications.filter(app => app.isTopCandidate);
+        const otherCandidates = applications.filter(app => !app.isTopCandidate);
+
+        return NextResponse.json({
+            applications,
+            topCandidates,
+            otherCandidates,
+            stats: {
+                total: applications.length,
+                topCandidates: topCandidates.length,
+                withScores: applications.filter(app => app.compositeScore !== null).length
+            }
+        });
     } catch (error) {
         console.error("Error fetching applications:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

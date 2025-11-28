@@ -62,7 +62,23 @@ export default function CreateResumePage() {
 
     useEffect(() => {
         fetchAllResumes();
+
+        // Load saved draft
+        const savedPrompt = localStorage.getItem("resume_prompt_draft");
+        const savedTemplate = localStorage.getItem("resume_template_draft");
+
+        if (savedPrompt) setPrompt(savedPrompt);
+        if (savedTemplate) setSelectedTemplate(savedTemplate);
     }, []);
+
+    // Save draft on change
+    useEffect(() => {
+        localStorage.setItem("resume_prompt_draft", prompt);
+    }, [prompt]);
+
+    useEffect(() => {
+        localStorage.setItem("resume_template_draft", selectedTemplate);
+    }, [selectedTemplate]);
 
     const fetchAllResumes = async () => {
         try {
@@ -96,6 +112,11 @@ export default function CreateResumePage() {
 
             const data = await response.json();
             toast.success("Resume generated successfully!");
+
+            // Clear draft
+            localStorage.removeItem("resume_prompt_draft");
+            localStorage.removeItem("resume_template_draft");
+
             // Redirect to resume view page
             window.location.href = `/dashboard/job-seeker/resume/${data.resumeId}`;
         } catch (error) {

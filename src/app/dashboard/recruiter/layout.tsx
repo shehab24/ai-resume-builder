@@ -1,15 +1,51 @@
+"use client";
+
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, PlusCircle } from "lucide-react";
-
+import { Briefcase, Users, PlusCircle, User } from "lucide-react";
+import { useEffect } from "react";
 import { Notifications } from "@/components/Notifications";
+import { RoleSwitcher } from "@/components/RoleSwitcher";
 
 export default function RecruiterLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    useEffect(() => {
+        const checkProfile = async () => {
+            try {
+                const res = await fetch("/api/user/profile");
+                if (res.ok) {
+                    const data = await res.json();
+
+                    // Check if user has correct role
+                    if (data.role && data.role !== "RECRUITER") {
+                        // Redirect to correct dashboard based on role
+                        if (data.role === "JOB_SEEKER") {
+                            window.location.href = "/dashboard/job-seeker";
+                        } else if (data.role === "ADMIN") {
+                            window.location.href = "/dashboard/admin";
+                        }
+                        return;
+                    }
+
+                    if (data.isBlocked) {
+                        if (data.blockedUntil && new Date(data.blockedUntil) < new Date()) {
+                            // Expired
+                        } else {
+                            window.location.href = "/blocked";
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to check profile:", error);
+            }
+        };
+        checkProfile();
+    }, []);
+
     return (
         <div className="flex min-h-screen bg-gray-100">
             {/* Sidebar */}
@@ -42,6 +78,12 @@ export default function RecruiterLayout({
                             Candidates
                         </Link>
                     </Button>
+                    <Button variant="ghost" className="w-full justify-start" asChild>
+                        <Link href="/dashboard/recruiter/profile">
+                            <User className="mr-2 h-4 w-4" />
+                            Profile
+                        </Link>
+                    </Button>
                 </nav>
             </aside>
 
@@ -50,6 +92,7 @@ export default function RecruiterLayout({
                 <header className="bg-white border-b h-16 flex items-center justify-between px-6">
                     <div className="md:hidden">Menu</div>
                     <div className="ml-auto flex items-center gap-4">
+                        <RoleSwitcher />
                         <Notifications />
                         <UserButton afterSignOutUrl="/" />
                     </div>

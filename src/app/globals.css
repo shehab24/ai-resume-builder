@@ -116,7 +116,34 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Cursor pointer for all interactive elements */
+  button,
+  a,
+  [role="button"],
+  [role="link"],
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  label,
+  select,
+  summary,
+  [onclick],
+  .cursor-pointer {
+    @apply cursor-pointer;
+  }
+
+  /* Disabled elements should not show pointer */
+  button:disabled,
+  [disabled],
+  [aria-disabled="true"] {
+    @apply cursor-not-allowed;
   }
 }

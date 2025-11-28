@@ -28,8 +28,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
             return NextResponse.json({ error: "Job not found or unauthorized" }, { status: 404 });
         }
 
-        // Delete job (and cascade delete applications/notifications if needed, but Prisma handles cascade if configured, or we do it manually)
-        // For now, simple delete.
+        // Delete associated applications first (manual cascade)
+        await prisma.application.deleteMany({
+            where: { jobId: id },
+        });
+
+        // Delete job
         await prisma.job.delete({
             where: { id },
         });
@@ -58,6 +62,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
         const { id } = await params;
         const body = await req.json();
+        console.log("PATCH Job Body:", body); // Debug log
 
         // Verify ownership
         const job = await prisma.job.findUnique({
@@ -76,6 +81,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 company: body.company,
                 description: body.description,
                 location: body.location,
+                country: body.country, // Added
                 jobType: body.jobType,
                 workMode: body.workMode,
                 experienceLevel: body.experienceLevel,
@@ -83,7 +89,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 salaryMax: body.salaryMax,
                 requirements: body.requirements,
                 benefits: body.benefits,
-                applicationDeadline: body.applicationDeadline ? new Date(body.applicationDeadline) : null,
+                applicationDeadline: body.applicationDeadline && body.applicationDeadline !== "" ? new Date(body.applicationDeadline) : null,
                 tasks: body.tasks,
             },
         });

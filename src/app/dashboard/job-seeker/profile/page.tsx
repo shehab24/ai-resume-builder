@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Save, User as UserIcon, Upload, Camera, Award, FileText } from "lucide-react";
+import { Loader2, Save, User as UserIcon, Camera, Award, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 const COUNTRIES = [
@@ -29,6 +29,7 @@ interface UserProfile {
     autoApply: boolean;
     matchThreshold: number; // 0-100 percentage
     autoApplyCountry: string; // optional country filter for auto-apply
+    warningCount: number;
 }
 
 export default function ProfilePage() {
@@ -40,11 +41,11 @@ export default function ProfilePage() {
         autoApply: false,
         matchThreshold: 95,
         autoApplyCountry: "",
+        warningCount: 0,
     });
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [resumeScore, setResumeScore] = useState<number | null>(null);
     const [resumeCount, setResumeCount] = useState(0);
 
@@ -66,6 +67,7 @@ export default function ProfilePage() {
                     autoApply: data.autoApply || false,
                     matchThreshold: data.matchThreshold ?? 95,
                     autoApplyCountry: data.autoApplyCountry || "",
+                    warningCount: data.warningCount || 0,
                 });
             }
         } catch (error) {
@@ -143,36 +145,6 @@ export default function ProfilePage() {
         }
     };
 
-    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            toast.error("Please upload an image file");
-            return;
-        }
-
-        // Validate file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            toast.error("Image size should be less than 5MB");
-            return;
-        }
-
-        setUploadingPhoto(true);
-        try {
-            // For now, create a local URL - in production, upload to cloud storage
-            const photoUrl = URL.createObjectURL(file);
-            setProfile({ ...profile, photoUrl });
-            toast.success("Photo uploaded! Click Save to update your profile.");
-        } catch (error) {
-            console.error(error);
-            toast.error("Failed to upload photo");
-        } finally {
-            setUploadingPhoto(false);
-        }
-    };
-
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -187,6 +159,33 @@ export default function ProfilePage() {
                 <h1 className="text-3xl font-bold">Profile Settings</h1>
                 <p className="text-muted-foreground mt-2">Manage your account and preferences</p>
             </div>
+
+            {/* Warning Banner */}
+            {profile.warningCount > 0 && (
+                <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
+                    <CardContent className="pt-6">
+                        <div className="flex items-start gap-3">
+                            <div className="bg-orange-100 dark:bg-orange-900 p-2 rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-orange-900 dark:text-orange-100 text-lg">
+                                    ⚠️ Account Warning
+                                </h3>
+                                <p className="text-sm text-orange-800 dark:text-orange-200 mt-2">
+                                    You have received <strong>{profile.warningCount}</strong> warning{profile.warningCount > 1 ? 's' : ''} for violating our community guidelines.
+                                    Please review our terms of service and ensure compliance to avoid account suspension.
+                                </p>
+                                <p className="text-xs text-orange-700 dark:text-orange-300 mt-2">
+                                    Check your notifications for details about the warnings.
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Profile Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -233,6 +232,9 @@ export default function ProfilePage() {
                         <Camera className="h-5 w-5" />
                         Profile Photo
                     </CardTitle>
+                    <CardDescription>
+                        Enter an image URL for your profile photo
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="flex items-center gap-6">
@@ -242,21 +244,19 @@ export default function ProfilePage() {
                                 {profile.name?.charAt(0)?.toUpperCase() || profile.email?.charAt(0)?.toUpperCase() || "U"}
                             </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1">
-                            <Label htmlFor="photo-upload" className="cursor-pointer">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                                    <Upload className="h-4 w-4" />
-                                    Upload a new photo (max 5MB)
-                                </div>
-                            </Label>
+                        <div className="flex-1 space-y-2">
+                            <Label htmlFor="photo-url">Image URL</Label>
                             <Input
-                                id="photo-upload"
-                                type="file"
-                                accept="image/*"
-                                onChange={handlePhotoUpload}
-                                disabled={uploadingPhoto}
-                                className="max-w-xs"
+                                id="photo-url"
+                                type="url"
+                                placeholder="https://example.com/your-photo.jpg"
+                                value={profile.photoUrl || ""}
+                                onChange={(e) => setProfile({ ...profile, photoUrl: e.target.value })}
+                                className="max-w-md"
                             />
+                            <p className="text-xs text-muted-foreground">
+                                Paste a URL to an image (e.g., from Imgur, your website, or any public image URL)
+                            </p>
                         </div>
                     </div>
                 </CardContent>

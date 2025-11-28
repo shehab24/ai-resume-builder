@@ -21,9 +21,10 @@ export default function EditJobPage() {
         company: "",
         description: "",
         location: "",
-        jobType: "FULL_TIME",
-        workMode: "ON_SITE",
-        experienceLevel: "MID",
+        country: "",
+        jobType: "Full-time",
+        workMode: "On-site",
+        experienceLevel: "Mid",
         salaryMin: "",
         salaryMax: "",
         requirements: "",
@@ -39,20 +40,29 @@ export default function EditJobPage() {
                 if (!res.ok) throw new Error("Failed to fetch job");
                 const job = await res.json();
 
+                console.log("Edit Page - Received job data:", job);
+
                 setFormData({
                     title: job.title || "",
                     company: job.company || "",
                     description: job.description || "",
                     location: job.location || "",
-                    jobType: job.jobType || "FULL_TIME",
-                    workMode: job.workMode || "ON_SITE",
-                    experienceLevel: job.experienceLevel || "MID",
+                    country: job.country || "",
+                    jobType: job.jobType || "Full-time",
+                    workMode: job.workMode || "On-site",
+                    experienceLevel: job.experienceLevel || "Mid",
                     salaryMin: job.salaryMin?.toString() || "",
                     salaryMax: job.salaryMax?.toString() || "",
                     requirements: job.requirements?.join(", ") || "",
                     benefits: job.benefits?.join(", ") || "",
                     applicationDeadline: job.applicationDeadline ? new Date(job.applicationDeadline).toISOString().split('T')[0] : "",
                     tasks: job.tasks?.join(", ") || "",
+                });
+
+                console.log("Edit Page - Set formData:", {
+                    jobType: job.jobType,
+                    workMode: job.workMode,
+                    experienceLevel: job.experienceLevel
                 });
             } catch (error) {
                 console.error(error);
@@ -158,10 +168,10 @@ export default function EditJobPage() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="FULL_TIME">Full Time</SelectItem>
-                                        <SelectItem value="PART_TIME">Part Time</SelectItem>
-                                        <SelectItem value="CONTRACT">Contract</SelectItem>
-                                        <SelectItem value="INTERNSHIP">Internship</SelectItem>
+                                        <SelectItem value="Full-time">Full-time</SelectItem>
+                                        <SelectItem value="Part-time">Part-time</SelectItem>
+                                        <SelectItem value="Contract">Contract</SelectItem>
+                                        <SelectItem value="Internship">Internship</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -173,9 +183,9 @@ export default function EditJobPage() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="ON_SITE">On-site</SelectItem>
-                                        <SelectItem value="REMOTE">Remote</SelectItem>
-                                        <SelectItem value="HYBRID">Hybrid</SelectItem>
+                                        <SelectItem value="On-site">On-site</SelectItem>
+                                        <SelectItem value="Remote">Remote</SelectItem>
+                                        <SelectItem value="Hybrid">Hybrid</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -187,10 +197,10 @@ export default function EditJobPage() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="ENTRY">Entry</SelectItem>
-                                        <SelectItem value="MID">Mid</SelectItem>
-                                        <SelectItem value="SENIOR">Senior</SelectItem>
-                                        <SelectItem value="LEAD">Lead</SelectItem>
+                                        <SelectItem value="Entry">Entry Level</SelectItem>
+                                        <SelectItem value="Mid">Mid Level</SelectItem>
+                                        <SelectItem value="Senior">Senior</SelectItem>
+                                        <SelectItem value="Lead">Lead/Principal</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -198,7 +208,26 @@ export default function EditJobPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="location">Location</Label>
+                                <Label htmlFor="country">Country</Label>
+                                <Select value={formData.country} onValueChange={(value) => setFormData({ ...formData, country: value })}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select country" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Worldwide">Worldwide / Remote</SelectItem>
+                                        <SelectItem value="United States">United States</SelectItem>
+                                        <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                                        <SelectItem value="Canada">Canada</SelectItem>
+                                        <SelectItem value="Germany">Germany</SelectItem>
+                                        <SelectItem value="France">France</SelectItem>
+                                        <SelectItem value="India">India</SelectItem>
+                                        <SelectItem value="Australia">Australia</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="location">City / State</Label>
                                 <Input
                                     id="location"
                                     value={formData.location}

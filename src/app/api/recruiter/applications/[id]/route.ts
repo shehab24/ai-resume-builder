@@ -14,7 +14,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         });
 
         if (!user || user.role !== "RECRUITER") {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
         }
 
         const { id } = await params;
@@ -24,22 +24,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             include: {
                 user: {
                     select: {
-                        id: true,
                         name: true,
                         email: true,
-                        resumes: {
-                            take: 1,
-                            orderBy: [
-                                { isDefault: 'desc' },
-                                { createdAt: 'desc' }
-                            ]
-                        }
-                    }
+                        photoUrl: true,
+                    },
                 },
                 job: {
                     select: {
                         title: true,
-                        company: true
+                        tasks: true,
+                        recruiterId: true
                     }
                 }
             },
@@ -49,7 +43,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             return NextResponse.json({ error: "Application not found" }, { status: 404 });
         }
 
-        return NextResponse.json(application);
+        // Fetch the user's default resume
+        const resume = await prisma.resume.findFirst({
+            where: {
+                userId: application.userId,
+                isDefault: true
+            }
+        });
+
+        // Verify the application belongs to a job posted by this recruiter
+        if (application.job.recruiterId !== user.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+        }
+
+        return NextResponse.json({
+            application: {
+                ...application,
+                resumeContent: resume ? JSON.parse(resume.content) : null
+            }
+        });
     } catch (error) {
         console.error("Error fetching application:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

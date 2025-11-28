@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Briefcase, FileText, Home, User, AlertTriangle, X } from "lucide-react";
 import { Notifications } from "@/components/Notifications";
+import { RoleSwitcher } from "@/components/RoleSwitcher";
 import { useEffect, useState } from "react";
 
 export default function JobSeekerLayout({
@@ -22,6 +23,30 @@ export default function JobSeekerLayout({
                 const res = await fetch("/api/user/profile");
                 if (res.ok) {
                     const data = await res.json();
+
+                    // Check if user has correct role
+                    if (data.role && data.role !== "JOB_SEEKER") {
+                        // Redirect to correct dashboard based on role
+                        if (data.role === "RECRUITER") {
+                            window.location.href = "/dashboard/recruiter";
+                        } else if (data.role === "ADMIN") {
+                            window.location.href = "/dashboard/admin";
+                        }
+                        return;
+                    }
+
+                    // Check if blocked
+                    if (data.isBlocked) {
+                        // Check if block is expired
+                        if (data.blockedUntil && new Date(data.blockedUntil) < new Date()) {
+                            // Block expired, ideally we should call an API to unblock or just let them in
+                            // For now, let's assume the backend handles auto-unblock or we just ignore it if expired
+                        } else {
+                            window.location.href = "/blocked";
+                            return;
+                        }
+                    }
+
                     // Check if country is null, undefined, or empty string
                     if (data.country === null || data.country === undefined || data.country === "") {
                         setShowWarning(true);
@@ -75,6 +100,7 @@ export default function JobSeekerLayout({
                 <header className="bg-white border-b h-16 flex items-center justify-between px-6">
                     <div className="md:hidden">Menu</div> {/* Mobile menu trigger placeholder */}
                     <div className="ml-auto flex items-center gap-4">
+                        <RoleSwitcher />
                         <Notifications />
                         <UserButton afterSignOutUrl="/" />
                     </div>

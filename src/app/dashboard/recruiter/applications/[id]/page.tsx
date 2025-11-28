@@ -2,75 +2,94 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Mail, User, Calendar, FileText, Briefcase, GraduationCap, Award, ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, ArrowLeft, Mail, Calendar, ExternalLink, Code, Briefcase, GraduationCap, CheckCircle, XCircle, UserCheck, MessageSquare, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-interface Resume {
-    id: string;
-    title: string;
-    content: string; // JSON string
+interface ResumeContent {
+    summary: string;
+    skills: string[];
+    experience: Array<{
+        position: string;
+        company: string;
+        startDate: string;
+        endDate: string;
+        description: string;
+    }>;
+    education: Array<{
+        degree: string;
+        school: string;
+        year: string;
+    }>;
 }
 
 interface Application {
     id: string;
     status: string;
     createdAt: string;
+    resumeScore: number | null;
+    taskScore: number | null;
+    compositeScore: number | null;
+    aiEvaluation: string | null;
+    taskSubmissions: string[];
     user: {
-        name: string;
+        name: string | null;
         email: string;
-        resumes: Resume[];
+        photoUrl: string | null;
     };
     job: {
         title: string;
-        company: string;
+        tasks: string[];
     };
-    taskSubmissions: string[];
+    resumeContent: ResumeContent | null;
 }
 
 export default function ApplicationDetailsPage() {
     const params = useParams();
     const router = useRouter();
-    const [application, setApplication] = useState<Application | null>(null);
+    const applicationId = params.id as string;
+
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
+    const [application, setApplication] = useState<Application | null>(null);
+    const [generatingQuestions, setGeneratingQuestions] = useState(false);
+    const [interviewQuestions, setInterviewQuestions] = useState<any>(null);
 
     useEffect(() => {
-        const fetchApplication = async () => {
-            try {
-                const response = await fetch(`/api/recruiter/applications/${params.id}`);
-                if (!response.ok) throw new Error("Failed to fetch application");
-                const data = await response.json();
-                setApplication(data);
-            } catch (error) {
-                console.error(error);
-                toast.error("Failed to load application details");
-            } finally {
-                setLoading(false);
-            }
-        };
+        fetchApplication();
+    }, [applicationId]);
 
-        if (params.id) {
-            fetchApplication();
+    const fetchApplication = async () => {
+        try {
+            const res = await fetch(`/api/recruiter/applications/${applicationId}`);
+            if (!res.ok) throw new Error("Failed to fetch application");
+            const data = await res.json();
+            setApplication(data.application);
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to load application details");
+        } finally {
+            setLoading(false);
         }
-    }, [params.id]);
+    };
 
-    const handleStatusChange = async (newStatus: string) => {
+    const updateStatus = async (status: string) => {
         setUpdating(true);
         try {
-            const response = await fetch(`/api/recruiter/applications/${params.id}/status`, {
+            const res = await fetch(`/api/recruiter/applications/${applicationId}/status`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: newStatus }),
+                body: JSON.stringify({ status })
             });
 
-            if (!response.ok) throw new Error("Failed to update status");
+            if (!res.ok) throw new Error("Failed to update status");
 
-            setApplication(prev => prev ? { ...prev, status: newStatus } : null);
-            toast.success("Application status updated");
+            toast.success(`Application marked as ${status}`);
+            fetchApplication(); // Refresh
         } catch (error) {
             console.error(error);
             toast.error("Failed to update status");
@@ -79,185 +98,382 @@ export default function ApplicationDetailsPage() {
         }
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        );
-    }
+    const generateInterviewQuestions = async () => {
+        if (!application) return;
 
-    if (!application) {
-        return <div>Application not found</div>;
-    }
-
-    const resume = application.user.resumes[0];
-    let resumeData = null;
-    if (resume) {
+        setGeneratingQuestions(true);
         try {
-            resumeData = JSON.parse(resume.content);
-        } catch (e) {
-            console.error("Error parsing resume content", e);
+            const res = await fetch('/api/ai/generate-interview-questions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    candidateName: application.user.name || 'Candidate',
+                    jobTitle: application.job.title,
+                    jobRequirements: application.job.tasks,
+                    resumeContent: application.resumeContent,
+                    taskSubmission: application.taskSubmissions[0] || null,
+                    aiEvaluation: application.aiEvaluation
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to generate questions');
+
+            const data = await res.json();
+            setInterviewQuestions(data.questions);
+            toast.success('Interview questions generated!');
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to generate interview questions');
+        } finally {
+            setGeneratingQuestions(false);
         }
-    }
+    };
+
+    const isUrl = (text: string) => {
+        try {
+            new URL(text);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+    if (!application) return <div className="p-10 text-center">Application not found</div>;
+
+    const evaluation = application.aiEvaluation ? JSON.parse(application.aiEvaluation) : null;
+    const resume = application.resumeContent;
 
     return (
-        <div className="max-w-5xl mx-auto space-y-6 pb-12">
+        <div className="max-w-6xl mx-auto space-y-6 p-6">
             <Button variant="ghost" onClick={() => router.back()} className="mb-4">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Candidates
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to List
             </Button>
 
-            <div className="grid gap-6 md:grid-cols-3">
-                {/* Sidebar: Applicant Info & Status */}
-                <div className="md:col-span-1 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Applicant Details</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <User className="h-5 w-5 text-primary" />
-                                </div>
-                                <div>
-                                    <p className="font-semibold">{application.user.name || "Anonymous"}</p>
-                                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                        <Mail className="h-3 w-3" /> {application.user.email}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="pt-4 border-t">
-                                <p className="text-sm font-medium mb-2">Applied for</p>
-                                <p className="font-semibold">{application.job.title}</p>
-                                <p className="text-sm text-muted-foreground">{application.job.company}</p>
-                                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    {new Date(application.createdAt).toLocaleDateString()}
-                                </p>
-                            </div>
-
-                            <div className="pt-4 border-t">
-                                <p className="text-sm font-medium mb-2">Application Status</p>
-                                <Select
-                                    defaultValue={application.status}
-                                    onValueChange={handleStatusChange}
-                                    disabled={updating}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="PENDING">Pending</SelectItem>
-                                        <SelectItem value="REVIEWED">Reviewed</SelectItem>
-                                        <SelectItem value="SHORTLISTED">Shortlisted</SelectItem>
-                                        <SelectItem value="INTERVIEW">Interview</SelectItem>
-                                        <SelectItem value="HIRED">Hired</SelectItem>
-                                        <SelectItem value="REJECTED">Rejected</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </CardContent>
-                    </Card>
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-lg border shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center text-white font-bold text-2xl">
+                        {application.user.name?.charAt(0) || application.user.email.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold">{application.user.name || "Anonymous Candidate"}</h1>
+                        <p className="text-muted-foreground flex items-center gap-2">
+                            <Mail className="h-4 w-4" /> {application.user.email}
+                        </p>
+                        <Badge variant="outline" className="mt-2">{application.status}</Badge>
+                    </div>
                 </div>
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        className="text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
+                        onClick={() => updateStatus("SHORTLISTED")}
+                        disabled={updating}
+                    >
+                        <CheckCircle className="mr-2 h-4 w-4" /> Shortlist
+                    </Button>
+                    <Button
+                        variant="default"
+                        onClick={() => updateStatus("INTERVIEW")}
+                        disabled={updating}
+                    >
+                        <UserCheck className="mr-2 h-4 w-4" /> Interview
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        onClick={() => updateStatus("REJECTED")}
+                        disabled={updating}
+                    >
+                        <XCircle className="mr-2 h-4 w-4" /> Reject
+                    </Button>
+                </div>
+            </div>
 
-                {/* Main Content: Resume & Tasks */}
-                <div className="md:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column: Resume Info */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Resume Summary */}
+                    {resume && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Briefcase className="h-5 w-5 text-primary" />
+                                    Resume Highlights
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <div>
+                                    <h3 className="font-semibold mb-2">Summary</h3>
+                                    <p className="text-sm text-muted-foreground">{resume.summary}</p>
+                                </div>
+
+                                <div>
+                                    <h3 className="font-semibold mb-2">Skills</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {resume.skills?.map((skill, i) => (
+                                            <Badge key={i} variant="secondary">{skill}</Badge>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="font-semibold mb-2">Experience</h3>
+                                    <div className="space-y-4">
+                                        {resume.experience?.slice(0, 2).map((exp, i) => (
+                                            <div key={i} className="border-l-2 border-primary/20 pl-4">
+                                                <h4 className="font-medium">{exp.position}</h4>
+                                                <p className="text-sm text-muted-foreground">{exp.company} • {exp.startDate} - {exp.endDate}</p>
+                                                <p className="text-sm mt-1 line-clamp-2">{exp.description}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* AI Evaluation */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
-                                <FileText className="h-5 w-5" />
-                                Resume
+                                <Code className="h-5 w-5 text-purple-500" />
+                                AI Task Evaluation
                             </CardTitle>
-                            <CardDescription>
-                                {resume ? resume.title : "No resume attached"}
-                            </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            {resumeData ? (
-                                <div className="space-y-6">
-                                    {/* Summary */}
-                                    {resumeData.summary && (
-                                        <div>
-                                            <h3 className="font-semibold mb-2 text-lg">Professional Summary</h3>
-                                            <p className="text-sm text-muted-foreground leading-relaxed">
-                                                {resumeData.summary}
-                                            </p>
+                        <CardContent className="space-y-4">
+                            {evaluation ? (
+                                <>
+                                    <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border">
+                                        <h3 className="font-semibold mb-2">AI Summary</h3>
+                                        <p className="text-sm text-muted-foreground">{evaluation.summary}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                                            <h4 className="font-semibold text-green-700 dark:text-green-400 text-sm mb-1">Strengths</h4>
+                                            <p className="text-xs">{evaluation.strengths}</p>
                                         </div>
-                                    )}
-
-                                    {/* Experience */}
-                                    {resumeData.experience && resumeData.experience.length > 0 && (
-                                        <div>
-                                            <h3 className="font-semibold mb-3 text-lg flex items-center gap-2">
-                                                <Briefcase className="h-4 w-4" /> Experience
-                                            </h3>
-                                            <div className="space-y-4">
-                                                {resumeData.experience.map((exp: any, i: number) => (
-                                                    <div key={i} className="border-l-2 border-primary/20 pl-4">
-                                                        <h4 className="font-medium">{exp.role}</h4>
-                                                        <p className="text-sm text-muted-foreground">{exp.company} | {exp.duration}</p>
-                                                        <p className="text-sm mt-1">{exp.description}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                        <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+                                            <h4 className="font-semibold text-red-700 dark:text-red-400 text-sm mb-1">Weaknesses</h4>
+                                            <p className="text-xs">{evaluation.weaknesses}</p>
                                         </div>
-                                    )}
-
-                                    {/* Education */}
-                                    {resumeData.education && resumeData.education.length > 0 && (
-                                        <div>
-                                            <h3 className="font-semibold mb-3 text-lg flex items-center gap-2">
-                                                <GraduationCap className="h-4 w-4" /> Education
-                                            </h3>
-                                            <div className="space-y-4">
-                                                {resumeData.education.map((edu: any, i: number) => (
-                                                    <div key={i} className="border-l-2 border-primary/20 pl-4">
-                                                        <h4 className="font-medium">{edu.degree}</h4>
-                                                        <p className="text-sm text-muted-foreground">{edu.institution} | {edu.year}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Skills */}
-                                    {resumeData.skills && resumeData.skills.length > 0 && (
-                                        <div>
-                                            <h3 className="font-semibold mb-3 text-lg flex items-center gap-2">
-                                                <Award className="h-4 w-4" /> Skills
-                                            </h3>
-                                            <div className="flex flex-wrap gap-2">
-                                                {resumeData.skills.map((skill: string, i: number) => (
-                                                    <Badge key={i} variant="secondary">{skill}</Badge>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                                    </div>
+                                </>
                             ) : (
-                                <div className="text-center py-12 text-muted-foreground">
-                                    No resume data available to display.
-                                </div>
+                                <p className="text-muted-foreground italic">AI evaluation pending or not available.</p>
                             )}
                         </CardContent>
                     </Card>
 
-                    {/* Task Submissions */}
-                    {application.taskSubmissions && application.taskSubmissions.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Task Submissions</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <ul className="list-disc list-inside space-y-2">
-                                    {application.taskSubmissions.map((submission, i) => (
-                                        <li key={i} className="text-sm">{submission}</li>
-                                    ))}
-                                </ul>
-                            </CardContent>
-                        </Card>
-                    )}
+                    {/* Task Submission */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Task Submission</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="mb-4">
+                                <h4 className="font-semibold text-sm mb-2">Task Requirement:</h4>
+                                <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                                    {application.job.tasks[0] || "No specific task description."}
+                                </p>
+                            </div>
+
+                            <h4 className="font-semibold text-sm mb-2">Candidate's Solution:</h4>
+                            {application.taskSubmissions.length > 0 ? (
+                                application.taskSubmissions.map((submission, index) => (
+                                    <div key={index} className="mt-2">
+                                        {isUrl(submission) ? (
+                                            <a
+                                                href={submission}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-2 text-blue-600 hover:underline bg-blue-50 p-3 rounded-md border border-blue-100"
+                                            >
+                                                <ExternalLink className="h-4 w-4" />
+                                                {submission}
+                                            </a>
+                                        ) : (
+                                            <div className="rounded-md overflow-hidden border">
+                                                <SyntaxHighlighter
+                                                    language="javascript"
+                                                    style={vscDarkPlus}
+                                                    customStyle={{ margin: 0, borderRadius: 0 }}
+                                                    showLineNumbers
+                                                >
+                                                    {submission}
+                                                </SyntaxHighlighter>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-muted-foreground italic">No submission yet.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Right Column: Scores & Stats */}
+                <div className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Match Score</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="text-center p-6 bg-primary/5 rounded-lg">
+                                <div className="text-5xl font-bold text-primary mb-2">{application.compositeScore || "N/A"}</div>
+                                <div className="text-sm text-muted-foreground font-medium">Overall Composite Score</div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span>Resume Match</span>
+                                        <span className="font-bold">{application.resumeScore || 0}%</span>
+                                    </div>
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-blue-500"
+                                            style={{ width: `${application.resumeScore || 0}%` }}
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span>Task Quality</span>
+                                        <span className="font-bold">{application.taskScore || 0}%</span>
+                                    </div>
+                                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-purple-500"
+                                            style={{ width: `${application.taskScore || 0}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Application Info</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 text-sm">
+                            <div className="flex justify-between py-2 border-b">
+                                <span className="text-muted-foreground">Applied On</span>
+                                <span className="font-medium">{new Date(application.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <div className="flex justify-between py-2 border-b">
+                                <span className="text-muted-foreground">Job Title</span>
+                                <span className="font-medium">{application.job.title}</span>
+                            </div>
+                            <div className="flex justify-between py-2 border-b">
+                                <span className="text-muted-foreground">Current Status</span>
+                                <Badge variant="outline">{application.status}</Badge>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Interview Questions */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center justify-between">
+                                <span className="flex items-center gap-2">
+                                    <MessageSquare className="h-5 w-5 text-purple-500" />
+                                    Interview Questions
+                                </span>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {!interviewQuestions ? (
+                                <div className="text-center py-6">
+                                    <Sparkles className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+                                    <p className="text-sm text-muted-foreground mb-4">
+                                        Generate personalized interview questions based on this candidate's profile
+                                    </p>
+                                    <Button
+                                        onClick={generateInterviewQuestions}
+                                        disabled={generatingQuestions}
+                                        className="w-full"
+                                    >
+                                        {generatingQuestions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        {generatingQuestions ? 'Generating...' : 'Generate Questions'}
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <Badge variant="secondary" className="text-xs">
+                                            AI Generated
+                                        </Badge>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={generateInterviewQuestions}
+                                            disabled={generatingQuestions}
+                                        >
+                                            {generatingQuestions ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Regenerate'}
+                                        </Button>
+                                    </div>
+
+                                    {/* Technical Questions */}
+                                    {interviewQuestions.technical && interviewQuestions.technical.length > 0 && (
+                                        <div className="space-y-2">
+                                            <h4 className="font-semibold text-sm text-blue-700 dark:text-blue-400">
+                                                Technical ({interviewQuestions.technical.length})
+                                            </h4>
+                                            <div className="space-y-3">
+                                                {interviewQuestions.technical.slice(0, 3).map((q: any, i: number) => (
+                                                    <div key={i} className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-900">
+                                                        <p className="text-sm font-medium mb-1">{q.question}</p>
+                                                        <p className="text-xs text-muted-foreground">{q.relevance}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Behavioral Questions */}
+                                    {interviewQuestions.behavioral && interviewQuestions.behavioral.length > 0 && (
+                                        <div className="space-y-2">
+                                            <h4 className="font-semibold text-sm text-green-700 dark:text-green-400">
+                                                Behavioral ({interviewQuestions.behavioral.length})
+                                            </h4>
+                                            <div className="space-y-3">
+                                                {interviewQuestions.behavioral.slice(0, 2).map((q: any, i: number) => (
+                                                    <div key={i} className="bg-green-50 dark:bg-green-900/20 p-3 rounded-md border border-green-100 dark:border-green-900">
+                                                        <p className="text-sm font-medium mb-1">{q.question}</p>
+                                                        <p className="text-xs text-muted-foreground">{q.relevance}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Problem Solving */}
+                                    {interviewQuestions.problemSolving && interviewQuestions.problemSolving.length > 0 && (
+                                        <div className="space-y-2">
+                                            <h4 className="font-semibold text-sm text-purple-700 dark:text-purple-400">
+                                                Problem Solving ({interviewQuestions.problemSolving.length})
+                                            </h4>
+                                            <div className="space-y-3">
+                                                {interviewQuestions.problemSolving.slice(0, 2).map((q: any, i: number) => (
+                                                    <div key={i} className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-md border border-purple-100 dark:border-purple-900">
+                                                        <p className="text-sm font-medium mb-1">{q.question}</p>
+                                                        <p className="text-xs text-muted-foreground">{q.relevance}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <Button variant="outline" className="w-full mt-4" size="sm">
+                                        View All Questions
+                                    </Button>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </div>

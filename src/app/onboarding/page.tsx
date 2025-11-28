@@ -2,7 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -12,6 +12,39 @@ export default function OnboardingPage() {
     const { user } = useUser();
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
+    const [checkingRole, setCheckingRole] = useState(true);
+
+    // Check if user already has a role
+    useEffect(() => {
+        const checkExistingRole = async () => {
+            try {
+                const res = await fetch("/api/user/check");
+                if (res.ok) {
+                    const data = await res.json();
+
+                    // If user exists and has a role, redirect to their dashboard
+                    if (data.exists && data.role) {
+                        if (data.role === "ADMIN") {
+                            router.push("/dashboard/admin");
+                        } else if (data.role === "RECRUITER") {
+                            router.push("/dashboard/recruiter");
+                        } else {
+                            router.push("/dashboard/job-seeker");
+                        }
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error("Error checking role:", error);
+            } finally {
+                setCheckingRole(false);
+            }
+        };
+
+        if (user) {
+            checkExistingRole();
+        }
+    }, [user, router]);
 
     const handleRoleSelection = async (role: "JOB_SEEKER" | "RECRUITER") => {
         if (!user) {
@@ -43,6 +76,18 @@ export default function OnboardingPage() {
             setIsLoading(false);
         }
     };
+
+    // Show loading while checking role
+    if (checkingRole) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-50">
+                <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                    <p className="text-gray-600">Loading...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-50">

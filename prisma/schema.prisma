@@ -27,6 +27,11 @@ model User {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  // Moderation
+  isBlocked         Boolean  @default(false)
+  blockedUntil      DateTime?
+  warningCount      Int      @default(0)
+
   // Job Seeker relations
   resumes      Resume[]
   applications Application[]
@@ -75,6 +80,7 @@ model Job {
   // Professional Fields
   company          String?
   location         String?
+  country          String? // Added country field for better matching
   jobType          String?  // Full-time, Part-time, Contract, Internship
   workMode         String?  // Remote, Hybrid, On-site
   experienceLevel  String?  // Entry, Mid, Senior, Lead
@@ -94,20 +100,59 @@ model Job {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  // External Job Fields
+  isExternal       Boolean  @default(false) // True if scraped from external source
+  externalUrl      String?  // Original job posting URL
+  externalId       String?  // ID from external source
+  sourceId         String?  @db.ObjectId // Reference to JobSource
+  source           JobSource? @relation(fields: [sourceId], references: [id])
+  
+  // Application Method
+  applicationMethod String  @default("INTERNAL") // INTERNAL, EXTERNAL_LINK, EMAIL
+  applicationEmail  String? // If application is via email
+  
   applications     Application[]
 }
 
+// Track external job sources
+model JobSource {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   // e.g., "LinkedIn", "Indeed", "Company Website"
+  url         String   // Base URL of the source
+  description String?
+  isActive    Boolean  @default(true)
+  
+  // Scraping config (for future automation)
+  scrapingEnabled Boolean @default(false)
+  lastScrapedAt   DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  jobs        Job[]
+}
+
 model Application {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  jobId        String   @db.ObjectId
-  job          Job      @relation(fields: [jobId], references: [id])
-  userId       String   @db.ObjectId
-  user         User     @relation(fields: [userId], references: [id])
-  status       String   @default("PENDING") // PENDING, REVIEWED, INTERVIEW, REJECTED, HIRED
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @db.ObjectId
+  jobId            String   @db.ObjectId
+  status           String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  taskSubmissions  Json[]   @default([])
   
-  // Task submissions
-  taskSubmissions String[] // Array of task submission URLs or text
+  // AI Scoring Fields
+  resumeScore      Int?     // 0-100: How well resume matches job requirements
+  taskScore        Int?     // 0-100: AI evaluation of task submissions
+  compositeScore   Int?     // 0-100: Weighted average (40% resume + 60% task)
+  aiEvaluation     String?  // AI's detailed feedback on candidate
+  isTopCandidate   Boolean  @default(false) // Auto-set for top 10 candidates
   
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  job  Job  @relation(fields: [jobId], references: [id])
+
+  @@index([userId])
+  @@index([jobId])
+  @@index([compositeScore])
 }

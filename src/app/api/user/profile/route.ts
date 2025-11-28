@@ -16,9 +16,13 @@ export async function GET() {
                 email: true,
                 country: true,
                 photoUrl: true,
+                role: true,
                 autoApply: true,
                 matchThreshold: true,
                 autoApplyCountry: true,
+                isBlocked: true,
+                blockedUntil: true,
+                warningCount: true,
             },
         });
 

@@ -14,33 +14,33 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         });
 
         if (!user || user.role !== "RECRUITER") {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
         }
 
         const { id } = await params;
-        const body = await req.json();
-        const { status } = body;
+        const { status } = await req.json();
 
-        const application = await prisma.application.update({
+        const application = await prisma.application.findUnique({
             where: { id },
-            data: { status },
-            include: { job: { select: { title: true } } }
+            include: { job: true }
         });
 
-        // Notify Job Seeker
-        await prisma.notification.create({
-            data: {
-                userId: application.userId,
-                title: "Application Status Update",
-                message: `Your application for ${application.job.title} has been updated to ${status}.`,
-                type: "STATUS_UPDATE",
-                link: `/dashboard/job-seeker`
-            }
+        if (!application) {
+            return NextResponse.json({ error: "Application not found" }, { status: 404 });
+        }
+
+        if (application.job.recruiterId !== user.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+        }
+
+        const updatedApplication = await prisma.application.update({
+            where: { id },
+            data: { status }
         });
 
-        return NextResponse.json(application);
+        return NextResponse.json(updatedApplication);
     } catch (error) {
-        console.error("Error updating application status:", error);
+        console.error("Error updating status:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
