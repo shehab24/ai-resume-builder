@@ -86,6 +86,7 @@ model Job {
   experienceLevel  String?  // Entry, Mid, Senior, Lead
   
   // Compensation
+  salary           String?  // Display text like "$100k - $150k"
   salaryMin        Int?
   salaryMax        Int?
   salaryCurrency   String?  @default("USD")

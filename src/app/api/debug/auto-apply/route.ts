@@ -74,6 +74,6 @@ export async function GET(req: Request) {
         });
 
     } catch (error) {
-        return NextResponse.json({ error: error.message });
+        return NextResponse.json({ error: (error as any).message });
     }
 }
