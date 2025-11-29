@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ interface JobSource {
     name: string;
 }
 
-export default function AdminImportJobPage() {
+function AdminImportJobContent() {
     const router = useRouter();
     const [sources, setSources] = useState<JobSource[]>([]);
     const [loading, setLoading] = useState(true);
@@ -51,14 +51,7 @@ export default function AdminImportJobPage() {
             const res = await fetch("/api/admin/job-sources");
             if (!res.ok) throw new Error("Failed to fetch sources");
             const data = await res.json();
-            const activeSources = data.filter((s: any) => s.isActive);
-            setSources(activeSources);
-
-            // Auto-select source from URL if present
-            const urlSourceId = searchParams.get("sourceId");
-            if (urlSourceId) {
-                setFormData(prev => ({ ...prev, sourceId: urlSourceId }));
-            }
+            setSources(data.sources || []);
         } catch (error) {
             console.error(error);
             toast.error("Failed to load job sources");
@@ -67,102 +60,41 @@ export default function AdminImportJobPage() {
         }
     };
 
-    const handleAIParse = async () => {
+    const analyzeJobPosting = async () => {
         if (!importContent.trim()) {
-            toast.error("Please paste a URL or Job Description first");
+            toast.error("Please paste job posting content");
             return;
         }
 
         setAnalyzing(true);
         try {
-            // Determine if it's a URL or Text
-            const isUrl = importContent.startsWith("http");
-
             const res = await fetch("/api/admin/analyze-job", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    content: importContent,
-                    type: isUrl ? 'url' : 'text'
-                }),
+                body: JSON.stringify({ content: importContent }),
             });
 
-            if (!res.ok) throw new Error("Failed to analyze");
+            if (!res.ok) throw new Error("Failed to analyze job posting");
 
             const data = await res.json();
 
-            // Auto-fill the form
-            let detectedSourceId = formData.sourceId;
-
-            // Try to auto-detect or create source from URL
-            if (isUrl) {
-                try {
-                    const url = new URL(importContent);
-                    const domain = url.hostname.replace('www.', '');
-
-                    // Extract company name from domain (e.g., linkedin.com -> LinkedIn)
-                    const companyName = domain.split('.')[0];
-                    const sourceName = companyName.charAt(0).toUpperCase() + companyName.slice(1);
-
-                    // Check if source already exists
-                    let matchedSource = sources.find((s) =>
-                        s.name.toLowerCase() === sourceName.toLowerCase() ||
-                        s.name.toLowerCase().includes(companyName.toLowerCase())
-                    );
-
-                    // If not found, create a new source
-                    if (!matchedSource) {
-                        const createRes = await fetch("/api/admin/job-sources", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                name: sourceName,
-                                url: `https://${domain}`,
-                                isActive: true
-                            }),
-                        });
-
-                        if (createRes.ok) {
-                            const newSource = await createRes.json();
-                            matchedSource = newSource;
-
-                            // Add to sources array immediately
-                            setSources(prev => [...prev, newSource]);
-
-                            toast.success(`Created new job source: ${sourceName}`);
-                        }
-                    } else {
-                        toast.info(`Auto-selected source: ${matchedSource.name}`);
-                    }
-
-                    if (matchedSource) {
-                        detectedSourceId = matchedSource.id;
-                    }
-                } catch (urlError) {
-                    console.error("Failed to parse URL:", urlError);
-                }
-            }
-
+            // Pre-fill form with analyzed data
             setFormData(prev => ({
                 ...prev,
-                sourceId: detectedSourceId,
                 title: data.title || prev.title,
                 company: data.company || prev.company,
                 location: data.location || prev.location,
-                salary: data.salary || prev.salary,
                 description: data.description || prev.description,
-                requirements: data.requirements ? data.requirements.join("\n") : prev.requirements,
-                jobType: data.jobType || "Full-time",
-                workMode: data.workMode || "On-site",
-                applicationEmail: data.applicationEmail || prev.applicationEmail,
-                externalUrl: isUrl ? importContent : prev.externalUrl,
-                applicationMethod: data.applicationEmail ? "EMAIL" : "EXTERNAL_LINK"
+                requirements: data.requirements || prev.requirements,
+                salary: data.salary || prev.salary,
+                jobType: data.jobType || prev.jobType,
+                workMode: data.workMode || prev.workMode,
             }));
 
-            toast.success("Job details auto-filled by AI! 🪄");
+            toast.success("Job posting analyzed successfully!");
         } catch (error) {
             console.error(error);
-            toast.error("Failed to analyze job. Try pasting the text directly.");
+            toast.error("Failed to analyze job posting");
         } finally {
             setAnalyzing(false);
         }
@@ -170,31 +102,25 @@ export default function AdminImportJobPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!formData.sourceId || !formData.title || !formData.company) {
+            toast.error("Please fill in all required fields");
+            return;
+        }
+
         setSubmitting(true);
-
         try {
-            // Parse requirements
-            const requirements = formData.requirements
-                .split("\n")
-                .filter((r) => r.trim())
-                .map((r) => r.trim());
-
-            const payload = {
-                ...formData,
-                requirements,
-                isExternal: true,
-            };
-
             const res = await fetch("/api/admin/import-job", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(formData),
             });
 
             if (!res.ok) throw new Error("Failed to import job");
 
+            const data = await res.json();
             toast.success("Job imported successfully!");
-            router.push("/dashboard/admin");
+            router.push("/dashboard/admin/imported-jobs");
         } catch (error) {
             console.error(error);
             toast.error("Failed to import job");
@@ -205,8 +131,8 @@ export default function AdminImportJobPage() {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center min-h-screen">
-                <Loader2 className="h-8 w-8 animate-spin" />
+            <div className="flex items-center justify-center h-96">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
@@ -215,63 +141,56 @@ export default function AdminImportJobPage() {
         <div className="max-w-4xl mx-auto space-y-6">
             <div>
                 <h1 className="text-3xl font-bold">Import External Job</h1>
-                <p className="text-muted-foreground mt-1">
-                    Use AI to auto-fill details from a URL or description
+                <p className="text-muted-foreground mt-2">
+                    Import job postings from external sources to your platform
                 </p>
             </div>
 
-            {/* AI Smart Import Section */}
-            <Card className="border-2 border-purple-100 dark:border-purple-900 bg-purple-50/50 dark:bg-purple-950/20">
+            {/* AI Analysis Section */}
+            <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
-                        <Zap className="h-5 w-5" />
-                        Smart Import
+                    <CardTitle className="flex items-center gap-2">
+                        <Zap className="h-5 w-5 text-yellow-500" />
+                        AI-Powered Job Analysis
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
-                        <Label>Paste Job URL or Description Text</Label>
+                        <Label htmlFor="import-content">Paste Job Posting Content</Label>
                         <Textarea
-                            placeholder="Paste a LinkedIn link or the full job description here..."
+                            id="import-content"
+                            placeholder="Paste the full job posting content here (from LinkedIn, Indeed, etc.)..."
                             value={importContent}
                             onChange={(e) => setImportContent(e.target.value)}
-                            className="mt-2"
-                            rows={3}
+                            rows={8}
+                            className="font-mono text-sm"
                         />
                     </div>
                     <Button
-                        onClick={handleAIParse}
-                        disabled={analyzing || !importContent}
-                        className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                        onClick={analyzeJobPosting}
+                        disabled={analyzing || !importContent.trim()}
+                        className="w-full"
                     >
-                        {analyzing ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Analyzing with AI...
-                            </>
-                        ) : (
-                            <>
-                                <Zap className="mr-2 h-4 w-4" />
-                                Auto-Fill Details
-                            </>
-                        )}
+                        {analyzing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <Zap className="mr-2 h-4 w-4" />
+                        Analyze with AI
                     </Button>
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Job Details</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Manual Import Form */}
+            <form onSubmit={handleSubmit}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Job Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
                         {/* Source Selection */}
                         <div>
-                            <Label>Job Source *</Label>
+                            <Label htmlFor="source">Job Source *</Label>
                             <Select
                                 value={formData.sourceId}
                                 onValueChange={(value) => setFormData({ ...formData, sourceId: value })}
-                                required
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a source" />
@@ -289,20 +208,22 @@ export default function AdminImportJobPage() {
                         {/* Basic Info */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <Label>Job Title *</Label>
+                                <Label htmlFor="title">Job Title *</Label>
                                 <Input
-                                    placeholder="e.g., Senior Software Engineer"
+                                    id="title"
                                     value={formData.title}
                                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                    placeholder="e.g. Senior Software Engineer"
                                     required
                                 />
                             </div>
                             <div>
-                                <Label>Company *</Label>
+                                <Label htmlFor="company">Company *</Label>
                                 <Input
-                                    placeholder="e.g., Google"
+                                    id="company"
                                     value={formData.company}
                                     onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                                    placeholder="e.g. Google"
                                     required
                                 />
                             </div>
@@ -310,54 +231,56 @@ export default function AdminImportJobPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <Label>Location</Label>
+                                <Label htmlFor="location">Location</Label>
                                 <Input
-                                    placeholder="e.g., San Francisco, CA"
+                                    id="location"
                                     value={formData.location}
                                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                                    placeholder="e.g. San Francisco, CA"
                                 />
                             </div>
                             <div>
-                                <Label>Salary</Label>
+                                <Label htmlFor="salary">Salary Range</Label>
                                 <Input
-                                    placeholder="e.g., $120k - $180k"
+                                    id="salary"
                                     value={formData.salary}
                                     onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+                                    placeholder="e.g. $120k - $180k"
                                 />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <Label>Job Type</Label>
+                                <Label htmlFor="jobType">Job Type</Label>
                                 <Select
                                     value={formData.jobType}
                                     onValueChange={(value) => setFormData({ ...formData, jobType: value })}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select type" />
+                                        <SelectValue placeholder="Select job type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Full-time">Full-time</SelectItem>
-                                        <SelectItem value="Part-time">Part-time</SelectItem>
-                                        <SelectItem value="Contract">Contract</SelectItem>
-                                        <SelectItem value="Internship">Internship</SelectItem>
+                                        <SelectItem value="FULL_TIME">Full Time</SelectItem>
+                                        <SelectItem value="PART_TIME">Part Time</SelectItem>
+                                        <SelectItem value="CONTRACT">Contract</SelectItem>
+                                        <SelectItem value="INTERNSHIP">Internship</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div>
-                                <Label>Work Mode</Label>
+                                <Label htmlFor="workMode">Work Mode</Label>
                                 <Select
                                     value={formData.workMode}
                                     onValueChange={(value) => setFormData({ ...formData, workMode: value })}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select mode" />
+                                        <SelectValue placeholder="Select work mode" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Remote">Remote</SelectItem>
-                                        <SelectItem value="Hybrid">Hybrid</SelectItem>
-                                        <SelectItem value="On-site">On-site</SelectItem>
+                                        <SelectItem value="REMOTE">Remote</SelectItem>
+                                        <SelectItem value="HYBRID">Hybrid</SelectItem>
+                                        <SelectItem value="ONSITE">On-site</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -365,31 +288,31 @@ export default function AdminImportJobPage() {
 
                         {/* Description */}
                         <div>
-                            <Label>Job Description *</Label>
+                            <Label htmlFor="description">Job Description</Label>
                             <Textarea
-                                placeholder="Full job description..."
+                                id="description"
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                placeholder="Detailed job description..."
                                 rows={6}
-                                required
                             />
                         </div>
 
                         {/* Requirements */}
                         <div>
-                            <Label>Requirements (one per line) *</Label>
+                            <Label htmlFor="requirements">Requirements</Label>
                             <Textarea
-                                placeholder="Bachelor's degree in Computer Science&#10;5+ years of experience&#10;Proficient in React and Node.js"
+                                id="requirements"
                                 value={formData.requirements}
                                 onChange={(e) => setFormData({ ...formData, requirements: e.target.value })}
-                                rows={5}
-                                required
+                                placeholder="Job requirements (one per line)..."
+                                rows={6}
                             />
                         </div>
 
                         {/* Application Method */}
                         <div>
-                            <Label>Application Method *</Label>
+                            <Label htmlFor="applicationMethod">Application Method</Label>
                             <Select
                                 value={formData.applicationMethod}
                                 onValueChange={(value) => setFormData({ ...formData, applicationMethod: value })}
@@ -406,47 +329,60 @@ export default function AdminImportJobPage() {
 
                         {formData.applicationMethod === "EXTERNAL_LINK" && (
                             <div>
-                                <Label>External Application URL *</Label>
+                                <Label htmlFor="externalUrl">Application URL</Label>
                                 <Input
+                                    id="externalUrl"
                                     type="url"
-                                    placeholder="https://company.com/apply/job-id"
                                     value={formData.externalUrl}
                                     onChange={(e) => setFormData({ ...formData, externalUrl: e.target.value })}
-                                    required
+                                    placeholder="https://company.com/careers/apply"
                                 />
                             </div>
                         )}
 
                         {formData.applicationMethod === "EMAIL" && (
                             <div>
-                                <Label>Application Email *</Label>
+                                <Label htmlFor="applicationEmail">Application Email</Label>
                                 <Input
+                                    id="applicationEmail"
                                     type="email"
-                                    placeholder="jobs@company.com"
                                     value={formData.applicationEmail}
                                     onChange={(e) => setFormData({ ...formData, applicationEmail: e.target.value })}
-                                    required
+                                    placeholder="careers@company.com"
                                 />
                             </div>
                         )}
 
-                        {/* Submit */}
-                        <div className="flex gap-3">
+                        <div className="flex gap-2 pt-4">
                             <Button
                                 type="button"
                                 variant="outline"
                                 onClick={() => router.back()}
+                                className="flex-1"
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={submitting}>
+                            <Button type="submit" disabled={submitting} className="flex-1">
                                 {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                <Plus className="mr-2 h-4 w-4" />
                                 Import Job
                             </Button>
                         </div>
-                    </form>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            </form>
         </div>
+    );
+}
+
+export default function AdminImportJobPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center h-96">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        }>
+            <AdminImportJobContent />
+        </Suspense>
     );
 }
