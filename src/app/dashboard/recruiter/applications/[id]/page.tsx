@@ -5,10 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, Mail, Calendar, ExternalLink, Code, Briefcase, GraduationCap, CheckCircle, XCircle, UserCheck, MessageSquare, Sparkles } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Loader2, ArrowLeft, Mail, Calendar, ExternalLink, Code, Briefcase, GraduationCap, CheckCircle, XCircle, UserCheck, MessageSquare, Sparkles, Video } from "lucide-react";
 import { toast } from "sonner";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { RecruiterSearch } from "@/components/recruiter-search";
 
 interface ResumeContent {
     summary: string;
@@ -59,9 +63,27 @@ export default function ApplicationDetailsPage() {
     const [generatingQuestions, setGeneratingQuestions] = useState(false);
     const [interviewQuestions, setInterviewQuestions] = useState<any>(null);
 
+    // Interview scheduling state
+    const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [schedulingInterview, setSchedulingInterview] = useState(false);
+    const [scheduledDate, setScheduledDate] = useState("");
+    const [scheduledTime, setScheduledTime] = useState("");
+    const [duration, setDuration] = useState("60");
+    const [panelRecruiters, setPanelRecruiters] = useState<any[]>([]);
+
     useEffect(() => {
         fetchApplication();
     }, [applicationId]);
+
+    // Auto-open schedule modal if ?schedule=true in URL
+    useEffect(() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        if (searchParams.get('schedule') === 'true') {
+            setShowScheduleModal(true);
+            // Clean up URL
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, []);
 
     const fetchApplication = async () => {
         try {
@@ -129,6 +151,49 @@ export default function ApplicationDetailsPage() {
         }
     };
 
+    const scheduleInterview = async () => {
+        if (!scheduledDate || !scheduledTime) {
+            toast.error("Please select date and time");
+            return;
+        }
+
+        setSchedulingInterview(true);
+        try {
+            const scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`);
+
+            const res = await fetch('/api/interviews', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    applicationId,
+                    scheduledAt: scheduledAt.toISOString(),
+                    duration: parseInt(duration),
+                    panelRecruiterIds: panelRecruiters.map(r => r.id)
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to schedule interview');
+
+            const interview = await res.json();
+            toast.success('Interview scheduled successfully!');
+            setShowScheduleModal(false);
+            setPanelRecruiters([]); // Reset panel recruiters
+
+            // Show link to join interview (for testing)
+            setTimeout(() => {
+                toast.success(
+                    `Interview created! You can join at: /interview/${interview.id}`,
+                    { duration: 10000 }
+                );
+            }, 500);
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to schedule interview');
+        } finally {
+            setSchedulingInterview(false);
+        }
+    };
+
     const isUrl = (text: string) => {
         try {
             new URL(text);
@@ -164,7 +229,7 @@ export default function ApplicationDetailsPage() {
                         <Badge variant="outline" className="mt-2">{application.status}</Badge>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                     <Button
                         variant="outline"
                         className="text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
@@ -179,6 +244,13 @@ export default function ApplicationDetailsPage() {
                         disabled={updating}
                     >
                         <UserCheck className="mr-2 h-4 w-4" /> Interview
+                    </Button>
+                    <Button
+                        variant="outline"
+                        className="text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700"
+                        onClick={() => setShowScheduleModal(true)}
+                    >
+                        <Video className="mr-2 h-4 w-4" /> Schedule Video Interview
                     </Button>
                     <Button
                         variant="destructive"
@@ -476,6 +548,74 @@ export default function ApplicationDetailsPage() {
                     </Card>
                 </div>
             </div>
+
+            {/* Schedule Interview Modal */}
+            <Dialog open={showScheduleModal} onOpenChange={setShowScheduleModal}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Schedule Video Interview</DialogTitle>
+                        <DialogDescription>
+                            Schedule a video interview with {application?.user.name || 'the candidate'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="date">Date</Label>
+                                <Input
+                                    id="date"
+                                    type="date"
+                                    value={scheduledDate}
+                                    onChange={(e) => setScheduledDate(e.target.value)}
+                                    min={new Date().toISOString().split('T')[0]}
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="time">Time</Label>
+                                <Input
+                                    id="time"
+                                    type="time"
+                                    value={scheduledTime}
+                                    onChange={(e) => setScheduledTime(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <Label htmlFor="duration">Duration (minutes)</Label>
+                            <Input
+                                id="duration"
+                                type="number"
+                                value={duration}
+                                onChange={(e) => setDuration(e.target.value)}
+                                min="15"
+                                step="15"
+                            />
+                        </div>
+
+                        {/* Panel Recruiters Section */}
+                        <div className="space-y-2">
+                            <Label>Interview Panel (Optional)</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Add other recruiters to join this interview
+                            </p>
+                            <RecruiterSearch
+                                selectedRecruiters={panelRecruiters}
+                                onSelect={(recruiter) => setPanelRecruiters([...panelRecruiters, recruiter])}
+                                onRemove={(id) => setPanelRecruiters(panelRecruiters.filter(r => r.id !== id))}
+                            />
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setShowScheduleModal(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={scheduleInterview} disabled={schedulingInterview}>
+                            {schedulingInterview && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Schedule Interview
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -20,6 +20,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
         const { id } = await params;
 
+        // Delete related records first to avoid foreign key constraint errors
+        await prisma.application.deleteMany({
+            where: { jobId: id },
+        });
+
+        // Now delete the job
         await prisma.job.delete({
             where: { id },
         });

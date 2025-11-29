@@ -7,9 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, ExternalLink } from "lucide-react";
+import { Loader2, Plus, ExternalLink, Zap } from "lucide-react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface JobSource {
     id: string;
@@ -37,6 +37,11 @@ export default function AdminImportJobPage() {
         workMode: "",
     });
 
+    const [analyzing, setAnalyzing] = useState(false);
+    const [importContent, setImportContent] = useState("");
+
+    const searchParams = useSearchParams();
+
     useEffect(() => {
         fetchSources();
     }, []);
@@ -46,12 +51,120 @@ export default function AdminImportJobPage() {
             const res = await fetch("/api/admin/job-sources");
             if (!res.ok) throw new Error("Failed to fetch sources");
             const data = await res.json();
-            setSources(data.filter((s: any) => s.isActive));
+            const activeSources = data.filter((s: any) => s.isActive);
+            setSources(activeSources);
+
+            // Auto-select source from URL if present
+            const urlSourceId = searchParams.get("sourceId");
+            if (urlSourceId) {
+                setFormData(prev => ({ ...prev, sourceId: urlSourceId }));
+            }
         } catch (error) {
             console.error(error);
             toast.error("Failed to load job sources");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAIParse = async () => {
+        if (!importContent.trim()) {
+            toast.error("Please paste a URL or Job Description first");
+            return;
+        }
+
+        setAnalyzing(true);
+        try {
+            // Determine if it's a URL or Text
+            const isUrl = importContent.startsWith("http");
+
+            const res = await fetch("/api/admin/analyze-job", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    content: importContent,
+                    type: isUrl ? 'url' : 'text'
+                }),
+            });
+
+            if (!res.ok) throw new Error("Failed to analyze");
+
+            const data = await res.json();
+
+            // Auto-fill the form
+            let detectedSourceId = formData.sourceId;
+
+            // Try to auto-detect or create source from URL
+            if (isUrl) {
+                try {
+                    const url = new URL(importContent);
+                    const domain = url.hostname.replace('www.', '');
+
+                    // Extract company name from domain (e.g., linkedin.com -> LinkedIn)
+                    const companyName = domain.split('.')[0];
+                    const sourceName = companyName.charAt(0).toUpperCase() + companyName.slice(1);
+
+                    // Check if source already exists
+                    let matchedSource = sources.find((s) =>
+                        s.name.toLowerCase() === sourceName.toLowerCase() ||
+                        s.name.toLowerCase().includes(companyName.toLowerCase())
+                    );
+
+                    // If not found, create a new source
+                    if (!matchedSource) {
+                        const createRes = await fetch("/api/admin/job-sources", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                name: sourceName,
+                                url: `https://${domain}`,
+                                isActive: true
+                            }),
+                        });
+
+                        if (createRes.ok) {
+                            const newSource = await createRes.json();
+                            matchedSource = newSource;
+
+                            // Add to sources array immediately
+                            setSources(prev => [...prev, newSource]);
+
+                            toast.success(`Created new job source: ${sourceName}`);
+                        }
+                    } else {
+                        toast.info(`Auto-selected source: ${matchedSource.name}`);
+                    }
+
+                    if (matchedSource) {
+                        detectedSourceId = matchedSource.id;
+                    }
+                } catch (urlError) {
+                    console.error("Failed to parse URL:", urlError);
+                }
+            }
+
+            setFormData(prev => ({
+                ...prev,
+                sourceId: detectedSourceId,
+                title: data.title || prev.title,
+                company: data.company || prev.company,
+                location: data.location || prev.location,
+                salary: data.salary || prev.salary,
+                description: data.description || prev.description,
+                requirements: data.requirements ? data.requirements.join("\n") : prev.requirements,
+                jobType: data.jobType || "Full-time",
+                workMode: data.workMode || "On-site",
+                applicationEmail: data.applicationEmail || prev.applicationEmail,
+                externalUrl: isUrl ? importContent : prev.externalUrl,
+                applicationMethod: data.applicationEmail ? "EMAIL" : "EXTERNAL_LINK"
+            }));
+
+            toast.success("Job details auto-filled by AI! 🪄");
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to analyze job. Try pasting the text directly.");
+        } finally {
+            setAnalyzing(false);
         }
     };
 
@@ -103,9 +216,48 @@ export default function AdminImportJobPage() {
             <div>
                 <h1 className="text-3xl font-bold">Import External Job</h1>
                 <p className="text-muted-foreground mt-1">
-                    Manually add a job from an external source
+                    Use AI to auto-fill details from a URL or description
                 </p>
             </div>
+
+            {/* AI Smart Import Section */}
+            <Card className="border-2 border-purple-100 dark:border-purple-900 bg-purple-50/50 dark:bg-purple-950/20">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                        <Zap className="h-5 w-5" />
+                        Smart Import
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label>Paste Job URL or Description Text</Label>
+                        <Textarea
+                            placeholder="Paste a LinkedIn link or the full job description here..."
+                            value={importContent}
+                            onChange={(e) => setImportContent(e.target.value)}
+                            className="mt-2"
+                            rows={3}
+                        />
+                    </div>
+                    <Button
+                        onClick={handleAIParse}
+                        disabled={analyzing || !importContent}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                    >
+                        {analyzing ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Analyzing with AI...
+                            </>
+                        ) : (
+                            <>
+                                <Zap className="mr-2 h-4 w-4" />
+                                Auto-Fill Details
+                            </>
+                        )}
+                    </Button>
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>

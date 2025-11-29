@@ -16,6 +16,13 @@ interface Job {
     salary: string;
     requirements: string[];
     createdAt: string;
+    isExternal?: boolean;
+    externalUrl?: string;
+    applicationMethod?: string;
+    applicationEmail?: string;
+    company?: string;
+    recruiter: { name: string };
+    source?: { name: string };
 }
 
 export default function FindJobsPage() {
@@ -149,6 +156,14 @@ export default function FindJobsPage() {
                             <CardContent className="p-6 flex-1 flex flex-col">
                                 {/* Title */}
                                 <div className="space-y-3 flex-1">
+                                    {/* External Job Badge */}
+                                    {job.isExternal && (
+                                        <Badge variant="outline" className="w-fit bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300">
+                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                            {job.source?.name || 'External Job'}
+                                        </Badge>
+                                    )}
+
                                     <h3 className="text-xl font-bold line-clamp-2 group-hover:text-primary transition-colors">
                                         {job.title}
                                     </h3>
@@ -176,7 +191,7 @@ export default function FindJobsPage() {
                                     {/* Skills */}
                                     <div className="flex flex-wrap gap-2">
                                         {job.requirements.slice(0, 3).map((req, index) => (
-                                            <Badge key={index} variant="secondary" className="text-xs font-medium">
+                                            <Badge key={index} variant="secondary" className="text-xs font-medium max-w-[200px] truncate block">
                                                 {req}
                                             </Badge>
                                         ))}
@@ -195,20 +210,38 @@ export default function FindJobsPage() {
                                             day: 'numeric',
                                             year: 'numeric'
                                         })}</span>
+                                        <span className="mx-1">•</span>
+                                        <span>{job.company || job.recruiter?.name}</span>
                                     </div>
                                 </div>
 
                                 {/* Action Button */}
                                 <div className="pt-4">
-                                    <Button
-                                        asChild
-                                        className="w-full shadow-md hover:shadow-lg transition-shadow"
-                                    >
-                                        <Link href={`/dashboard/job-seeker/jobs/${job.id}`}>
+                                    {job.isExternal ? (
+                                        <Button
+                                            className="w-full shadow-md hover:shadow-lg transition-shadow bg-purple-600 hover:bg-purple-700"
+                                            onClick={() => {
+                                                if (job.applicationMethod === "EMAIL" && job.applicationEmail) {
+                                                    window.location.href = `mailto:${job.applicationEmail}`;
+                                                } else if (job.externalUrl) {
+                                                    window.open(job.externalUrl, "_blank");
+                                                }
+                                            }}
+                                        >
                                             <ExternalLink className="h-4 w-4 mr-2" />
-                                            View Details
-                                        </Link>
-                                    </Button>
+                                            Apply on Company Site
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            asChild
+                                            className="w-full shadow-md hover:shadow-lg transition-shadow"
+                                        >
+                                            <Link href={`/dashboard/job-seeker/jobs/${job.id}`}>
+                                                <Zap className="h-4 w-4 mr-2 fill-current" />
+                                                View & Apply
+                                            </Link>
+                                        </Button>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>

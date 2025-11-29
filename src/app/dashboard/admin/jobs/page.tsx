@@ -40,6 +40,7 @@ interface Job {
     jobType: string;
     workMode?: string;
     experienceLevel?: string;
+    salary?: string;
     salaryMin?: number;
     salaryMax?: number;
     description?: string;
@@ -49,6 +50,9 @@ interface Job {
     recruiter: {
         name: string;
         email: string;
+    };
+    source?: {
+        name: string;
     };
     _count: {
         applications: number;
@@ -150,6 +154,7 @@ export default function JobManagementPage() {
                         <TableRow>
                             <TableHead>Job Title</TableHead>
                             <TableHead>Company</TableHead>
+                            <TableHead>Source</TableHead>
                             <TableHead>Recruiter</TableHead>
                             <TableHead>Applications</TableHead>
                             <TableHead>Posted</TableHead>
@@ -159,13 +164,13 @@ export default function JobManagementPage() {
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
+                                <TableCell colSpan={7} className="h-24 text-center">
                                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />
                                 </TableCell>
                             </TableRow>
                         ) : jobs.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center text-gray-500">
+                                <TableCell colSpan={7} className="h-24 text-center text-gray-500">
                                     No jobs found.
                                 </TableCell>
                             </TableRow>
@@ -179,6 +184,15 @@ export default function JobManagementPage() {
                                         </div>
                                     </TableCell>
                                     <TableCell>{job.company}</TableCell>
+                                    <TableCell>
+                                        {job.source ? (
+                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                                {job.source.name}
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="secondary">Internal</Badge>
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         <div className="flex flex-col">
                                             <span className="text-sm">{job.recruiter?.name || "Unknown"}</span>
@@ -250,90 +264,92 @@ export default function JobManagementPage() {
 
             {/* View Job Modal */}
             <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-                <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="text-2xl font-bold">{selectedJob?.title}</DialogTitle>
+                <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+                    <DialogHeader className="shrink-0">
+                        <DialogTitle className="text-2xl font-bold pr-8">{selectedJob?.title}</DialogTitle>
                         <DialogDescription>
                             Posted by {selectedJob?.recruiter?.name} ({selectedJob?.recruiter?.email})
                         </DialogDescription>
                     </DialogHeader>
 
-                    {selectedJob && (
-                        <div className="space-y-6 mt-4">
-                            {/* Key Details */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                <div className="space-y-1">
-                                    <div className="flex items-center text-sm text-gray-500">
-                                        <Building className="w-4 h-4 mr-1" /> Company
+                    <div className="overflow-y-auto flex-1 pr-2">
+                        {selectedJob && (
+                            <div className="space-y-6 mt-4">
+                                {/* Key Details */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center text-sm text-gray-500">
+                                            <Building className="w-4 h-4 mr-1" /> Company
+                                        </div>
+                                        <p className="font-medium break-words">{selectedJob.company}</p>
                                     </div>
-                                    <p className="font-medium">{selectedJob.company}</p>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center text-sm text-gray-500">
+                                            <MapPin className="w-4 h-4 mr-1" /> Location
+                                        </div>
+                                        <p className="font-medium break-words">{selectedJob.location}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center text-sm text-gray-500">
+                                            <Briefcase className="w-4 h-4 mr-1" /> Type
+                                        </div>
+                                        <p className="font-medium">{selectedJob.jobType}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center text-sm text-gray-500">
+                                            <DollarSign className="w-4 h-4 mr-1" /> Salary
+                                        </div>
+                                        <p className="font-medium break-words">
+                                            {selectedJob.salary || (selectedJob.salaryMin && selectedJob.salaryMax
+                                                ? `$${selectedJob.salaryMin.toLocaleString()} - $${selectedJob.salaryMax.toLocaleString()}`
+                                                : "Not specified")}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center text-sm text-gray-500">
-                                        <MapPin className="w-4 h-4 mr-1" /> Location
-                                    </div>
-                                    <p className="font-medium">{selectedJob.location}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center text-sm text-gray-500">
-                                        <Briefcase className="w-4 h-4 mr-1" /> Type
-                                    </div>
-                                    <p className="font-medium">{selectedJob.jobType}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center text-sm text-gray-500">
-                                        <DollarSign className="w-4 h-4 mr-1" /> Salary
-                                    </div>
-                                    <p className="font-medium">
-                                        {selectedJob.salaryMin && selectedJob.salaryMax
-                                            ? `$${selectedJob.salaryMin.toLocaleString()} - $${selectedJob.salaryMax.toLocaleString()}`
-                                            : "Not specified"}
+
+                                {/* Description */}
+                                <div>
+                                    <h3 className="text-lg font-semibold mb-2">Description</h3>
+                                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
+                                        {selectedJob.description}
                                     </p>
                                 </div>
-                            </div>
 
-                            {/* Description */}
-                            <div>
-                                <h3 className="text-lg font-semibold mb-2">Description</h3>
-                                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                                    {selectedJob.description}
-                                </p>
-                            </div>
+                                {/* Requirements */}
+                                {selectedJob.requirements && selectedJob.requirements.length > 0 && (
+                                    <div>
+                                        <h3 className="text-lg font-semibold mb-2">Requirements</h3>
+                                        <ul className="list-disc pl-5 space-y-1">
+                                            {selectedJob.requirements.map((req, i) => (
+                                                <li key={i} className="text-gray-700 dark:text-gray-300 break-words">{req}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
 
-                            {/* Requirements */}
-                            {selectedJob.requirements && selectedJob.requirements.length > 0 && (
-                                <div>
-                                    <h3 className="text-lg font-semibold mb-2">Requirements</h3>
-                                    <ul className="list-disc pl-5 space-y-1">
-                                        {selectedJob.requirements.map((req, i) => (
-                                            <li key={i} className="text-gray-700 dark:text-gray-300">{req}</li>
-                                        ))}
-                                    </ul>
+                                {/* Benefits */}
+                                {selectedJob.benefits && selectedJob.benefits.length > 0 && (
+                                    <div>
+                                        <h3 className="text-lg font-semibold mb-2">Benefits</h3>
+                                        <ul className="list-disc pl-5 space-y-1">
+                                            {selectedJob.benefits.map((ben, i) => (
+                                                <li key={i} className="text-gray-700 dark:text-gray-300 break-words">{ben}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                <div className="pt-4 border-t flex justify-end gap-2 sticky bottom-0 bg-white dark:bg-gray-900 pb-2">
+                                    <Button variant="outline" onClick={() => setIsViewOpen(false)}>Close</Button>
+                                    <Link href={`/dashboard/admin/jobs/${selectedJob.id}/edit`}>
+                                        <Button>Edit Job</Button>
+                                    </Link>
                                 </div>
-                            )}
-
-                            {/* Benefits */}
-                            {selectedJob.benefits && selectedJob.benefits.length > 0 && (
-                                <div>
-                                    <h3 className="text-lg font-semibold mb-2">Benefits</h3>
-                                    <ul className="list-disc pl-5 space-y-1">
-                                        {selectedJob.benefits.map((ben, i) => (
-                                            <li key={i} className="text-gray-700 dark:text-gray-300">{ben}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            <div className="pt-4 border-t flex justify-end gap-2">
-                                <Button variant="outline" onClick={() => setIsViewOpen(false)}>Close</Button>
-                                <Link href={`/dashboard/admin/jobs/${selectedJob.id}/edit`}>
-                                    <Button>Edit Job</Button>
-                                </Link>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </DialogContent>
             </Dialog>
-        </div>
+        </div >
     );
 }

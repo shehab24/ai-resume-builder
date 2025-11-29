@@ -4,7 +4,7 @@ import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Briefcase, FileText, Home, User, AlertTriangle, X } from "lucide-react";
+import { Briefcase, FileText, Home, User, AlertTriangle, X, Video } from "lucide-react";
 import { Notifications } from "@/components/Notifications";
 import { RoleSwitcher } from "@/components/RoleSwitcher";
 import { useEffect, useState } from "react";
@@ -87,6 +87,10 @@ export default function JobSeekerLayout({
                     <Link href="/dashboard/job-seeker/applications" className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:bg-gray-100 ${pathname === "/dashboard/job-seeker/applications" ? "bg-gray-100" : ""}`}>
                         <FileText className="h-4 w-4" />
                         My Applications
+                    </Link>
+                    <Link href="/dashboard/job-seeker/interviews" className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:bg-gray-100 ${pathname === "/dashboard/job-seeker/interviews" ? "bg-gray-100" : ""}`}>
+                        <Video className="h-4 w-4" />
+                        Interviews
                     </Link>
                     <Link href="/dashboard/job-seeker/profile" className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:bg-gray-100 ${pathname === "/dashboard/job-seeker/profile" ? "bg-gray-100" : ""}`}>
                         <User className="h-4 w-4" />

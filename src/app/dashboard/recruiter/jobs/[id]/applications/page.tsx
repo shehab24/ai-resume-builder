@@ -140,8 +140,10 @@ export default function JobApplicationsPage() {
                                 View Details
                             </Link>
                         </Button>
-                        <Button variant="outline" className="flex-1">
-                            Schedule Interview
+                        <Button variant="outline" className="flex-1" asChild>
+                            <Link href={`/dashboard/recruiter/applications/${app.id}?schedule=true`}>
+                                Schedule Interview
+                            </Link>
                         </Button>
                     </div>
                 </CardContent>

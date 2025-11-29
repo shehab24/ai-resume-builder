@@ -51,6 +51,7 @@ export async function GET(req: Request) {
                             email: true,
                         }
                     },
+                    source: true,
                     _count: {
                         select: {
                             applications: true

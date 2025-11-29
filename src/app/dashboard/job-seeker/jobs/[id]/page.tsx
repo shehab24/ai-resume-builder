@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, MapPin, DollarSign, CheckCircle, Briefcase, Clock, Building, Calendar, Zap } from "lucide-react";
+import { Loader2, MapPin, DollarSign, CheckCircle, Briefcase, Clock, Building, Calendar, Zap, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 interface Job {
@@ -24,6 +24,10 @@ interface Job {
     tasks?: string[];
     company?: string;
     hasApplied?: boolean;
+    isExternal?: boolean;
+    externalUrl?: string;
+    applicationMethod?: string;
+    applicationEmail?: string;
 }
 
 export default function JobDetailsPage() {
@@ -73,7 +77,24 @@ export default function JobDetailsPage() {
         }
     }, [params.id]);
 
-    const handleQuickApply = async () => {
+    const handleApply = async () => {
+        if (!job) return;
+
+        // Handle External Application
+        if (job.isExternal) {
+            if (job.applicationMethod === "EMAIL" && job.applicationEmail) {
+                window.location.href = `mailto:${job.applicationEmail}?subject=Application for ${job.title}`;
+                toast.info("Opening email client...");
+                return;
+            }
+            if (job.applicationMethod === "EXTERNAL_LINK" && job.externalUrl) {
+                window.open(job.externalUrl, "_blank");
+                toast.success("Redirecting to application page...");
+                return;
+            }
+        }
+
+        // Handle Internal Quick Apply
         if (!hasResume) {
             toast.error("Please create a resume first to use Quick Apply");
             router.push("/dashboard/job-seeker/resume/create");
@@ -124,76 +145,103 @@ export default function JobDetailsPage() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-12">
-            <Card>
-                <CardHeader>
-                    <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                        <div>
-                            <CardTitle className="text-3xl font-bold">{job.title}</CardTitle>
-                            <div className="flex items-center gap-2 mt-2 text-muted-foreground">
-                                <Building className="h-4 w-4" />
-                                <span className="font-medium">{job.company || job.recruiter.name}</span>
+            <Card className="overflow-hidden border-t-4 border-t-primary">
+                <CardHeader className="bg-muted/10 pb-8">
+                    <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+                        <div className="space-y-4">
+                            <div>
+                                <h1 className="text-3xl font-bold tracking-tight">{job.title}</h1>
+                                <div className="flex items-center gap-2 mt-2 text-lg text-muted-foreground font-medium">
+                                    <Building className="h-5 w-5" />
+                                    <span>{job.company || job.recruiter.name}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-wrap gap-3">
+                                {job.location && (
+                                    <Badge variant="secondary" className="px-3 py-1.5 text-sm font-normal">
+                                        <MapPin className="mr-1.5 h-3.5 w-3.5" /> {job.location}
+                                    </Badge>
+                                )}
+                                {job.jobType && (
+                                    <Badge variant="secondary" className="px-3 py-1.5 text-sm font-normal">
+                                        <Briefcase className="mr-1.5 h-3.5 w-3.5" /> {job.jobType}
+                                    </Badge>
+                                )}
+                                {job.workMode && (
+                                    <Badge variant="secondary" className="px-3 py-1.5 text-sm font-normal">
+                                        <Clock className="mr-1.5 h-3.5 w-3.5" /> {job.workMode}
+                                    </Badge>
+                                )}
+                                {job.salary && (
+                                    <Badge variant="secondary" className="px-3 py-1.5 text-sm font-normal bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                                        <DollarSign className="mr-1.5 h-3.5 w-3.5" /> {job.salary}
+                                    </Badge>
+                                )}
                             </div>
                         </div>
-                        {hasApplied ? (
-                            <Button disabled className="bg-green-600 w-full md:w-auto">
-                                <CheckCircle className="mr-2 h-4 w-4" /> Applied
-                            </Button>
-                        ) : (
-                            <Button size="lg" onClick={handleQuickApply} disabled={applying} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700">
-                                {applying ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Zap className="mr-2 h-4 w-4 fill-current" />
-                                )}
-                                Quick Apply
-                            </Button>
-                        )}
-                    </div>
 
-                    <div className="flex flex-wrap gap-4 mt-6 text-sm">
-                        <Badge variant="outline" className="flex items-center gap-1 px-3 py-1">
-                            <MapPin className="h-3 w-3" /> {job.location || "Remote"}
-                        </Badge>
-                        <Badge variant="outline" className="flex items-center gap-1 px-3 py-1">
-                            <Briefcase className="h-3 w-3" /> {job.jobType || "Full-time"}
-                        </Badge>
-                        <Badge variant="outline" className="flex items-center gap-1 px-3 py-1">
-                            <Clock className="h-3 w-3" /> {job.workMode || "On-site"}
-                        </Badge>
-                        <Badge variant="outline" className="flex items-center gap-1 px-3 py-1">
-                            <DollarSign className="h-3 w-3" /> {job.salary || "Competitive"}
-                        </Badge>
-                        {job.applicationDeadline && (
-                            <Badge variant="destructive" className="flex items-center gap-1 px-3 py-1">
-                                <Calendar className="h-3 w-3" /> Deadline: {new Date(job.applicationDeadline).toLocaleDateString()}
-                            </Badge>
-                        )}
+                        <div className="w-full md:w-auto shrink-0">
+                            {hasApplied ? (
+                                <Button disabled className="bg-green-600 w-full md:w-auto h-12 text-base px-8">
+                                    <CheckCircle className="mr-2 h-5 w-5" /> Applied
+                                </Button>
+                            ) : (
+                                <Button
+                                    size="lg"
+                                    onClick={handleApply}
+                                    disabled={applying}
+                                    className="w-full md:w-auto h-12 text-base px-8 shadow-lg hover:shadow-xl transition-all"
+                                >
+                                    {applying ? (
+                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                    ) : job.isExternal ? (
+                                        <ExternalLink className="mr-2 h-5 w-5" />
+                                    ) : (
+                                        <Zap className="mr-2 h-5 w-5 fill-current" />
+                                    )}
+                                    {job.isExternal ? "Apply on Company Site" : "Quick Apply"}
+                                </Button>
+                            )}
+                            {job.applicationDeadline && (
+                                <p className="text-xs text-center mt-2 text-muted-foreground">
+                                    Deadline: {new Date(job.applicationDeadline).toLocaleDateString()}
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-8">
+                <CardContent className="space-y-8 pt-8">
                     <section>
-                        <h3 className="text-xl font-semibold mb-3">About the Role</h3>
-                        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">{job.description}</p>
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            About the Role
+                        </h3>
+                        <div className="prose dark:prose-invert max-w-none text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                            {job.description}
+                        </div>
                     </section>
 
                     <section>
-                        <h3 className="text-xl font-semibold mb-3">Requirements</h3>
-                        <div className="flex flex-wrap gap-2">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            Requirements
+                        </h3>
+                        <ul className="space-y-3">
                             {job.requirements.map((req, index) => (
-                                <Badge key={index} variant="secondary" className="px-3 py-1">
-                                    {req}
-                                </Badge>
+                                <li key={index} className="flex items-start gap-3 text-muted-foreground">
+                                    <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                                    <span className="leading-relaxed">{req}</span>
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                     </section>
 
                     {job.benefits && job.benefits.length > 0 && (
                         <section>
-                            <h3 className="text-xl font-semibold mb-3">Benefits</h3>
-                            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <h3 className="text-xl font-bold mb-4">Benefits</h3>
+                            <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {job.benefits.map((benefit, index) => (
-                                    <li key={index} className="flex items-center gap-2 text-muted-foreground">
-                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                    <li key={index} className="flex items-center gap-2 text-muted-foreground p-3 rounded-lg bg-muted/50">
+                                        <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                                         {benefit}
                                     </li>
                                 ))}

@@ -3,7 +3,7 @@
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, PlusCircle, User } from "lucide-react";
+import { Briefcase, Users, PlusCircle, User, Video } from "lucide-react";
 import { useEffect } from "react";
 import { Notifications } from "@/components/Notifications";
 import { RoleSwitcher } from "@/components/RoleSwitcher";
@@ -76,6 +76,12 @@ export default function RecruiterLayout({
                         <Link href="/dashboard/recruiter/candidates">
                             <Users className="mr-2 h-4 w-4" />
                             Candidates
+                        </Link>
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start" asChild>
+                        <Link href="/dashboard/recruiter/interviews">
+                            <Video className="mr-2 h-4 w-4" />
+                            Interviews
                         </Link>
                     </Button>
                     <Button variant="ghost" className="w-full justify-start" asChild>

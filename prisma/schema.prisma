@@ -41,6 +41,7 @@ model User {
   postedJobs Job[]
   
   notifications Notification[]
+  interviewParticipations InterviewParticipant[]
 }
 
 model Notification {
@@ -145,6 +146,7 @@ model Application {
   taskScore        Int?     // 0-100: AI evaluation of task submissions
   compositeScore   Int?     // 0-100: Weighted average (40% resume + 60% task)
   aiEvaluation     String?  // AI's detailed feedback on candidate
+  resumeContent    Json?    // Snapshot of resume content at time of application
   isTopCandidate   Boolean  @default(false) // Auto-set for top 10 candidates
   
   createdAt        DateTime @default(now())
@@ -152,8 +154,78 @@ model Application {
 
   user User @relation(fields: [userId], references: [id])
   job  Job  @relation(fields: [jobId], references: [id])
+  
+  interviews Interview[]
 
   @@index([userId])
   @@index([jobId])
   @@index([compositeScore])
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  ACCEPTED
+  DECLINED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Interview {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  applicationId   String          @db.ObjectId
+  application     Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  scheduledAt     DateTime
+  duration        Int             @default(60) // Duration in minutes
+  status          InterviewStatus @default(SCHEDULED)
+  
+  // Stream Video Call Details
+  streamCallId    String          @unique
+  
+  // Join tracking
+  recruiterJoined Boolean         @default(false)
+  seekerJoined    Boolean         @default(false)
+  
+  // Notes and feedback
+  recruiterNotes  String?
+  seekerNotes     String?
+  
+  // Structured Interview Notes (shared between both parties)
+  interviewMarks  Int?            // Overall rating out of 10
+  technicalMarks  Int?            // Technical skills rating out of 10
+  behavioralMarks Int?            // Behavioral/soft skills rating out of 10
+  salaryDiscussed String?         // Salary expectations discussed
+  benefits        String?         // Benefits discussed
+  startDate       String?         // Possible start date
+  keyTopics       String[]        @default([]) // Important topics discussed
+  interviewNotes  String?         // General notes from the interview
+  
+  // Recording
+  recordingUrl    String?
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  @@index([applicationId])
+  @@index([scheduledAt])
+  @@index([status])
+  
+  participants    InterviewParticipant[]
+}
+
+model InterviewParticipant {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  interviewId     String    @db.ObjectId
+  userId          String
+  role            String    // "PRIMARY_RECRUITER" | "PANEL_RECRUITER" | "CANDIDATE"
+  joinedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  
+  interview       Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([interviewId, userId])
+  @@index([userId])
+  @@index([interviewId])
 }

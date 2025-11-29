@@ -19,14 +19,45 @@ export async function GET() {
         }
 
         // Fetch all jobs EXCEPT those posted by the current user
-        // This prevents users from seeing their own job postings when they switch to job seeker role
-        const jobs = await prisma.job.findMany({
+        // For MongoDB: sourceId null check needs special handling
+        const allJobsNotByUser = await prisma.job.findMany({
             where: {
                 recruiterId: {
-                    not: user.id // Exclude jobs posted by this user
+                    not: user.id
+                }
+            },
+            include: {
+                recruiter: {
+                    select: {
+                        name: true,
+                        email: true
+                    }
+                },
+                source: {
+                    select: {
+                        name: true,
+                        isActive: true
+                    }
                 }
             },
             orderBy: { createdAt: "desc" },
+        });
+
+        // Filter in JavaScript: show internal jobs OR external jobs from active sources
+        const jobs = allJobsNotByUser.filter(job => {
+            if (!job.sourceId) {
+                // Internal job - always show
+                return true;
+            } else {
+                // External job - only show if source is active
+                return job.source?.isActive === true;
+            }
+        });
+
+        console.log(`[Jobs API] User: ${user.email} (ID: ${user.id})`);
+        console.log(`[Jobs API] Found ${jobs.length} jobs (filtered from ${allJobsNotByUser.length} total)`);
+        jobs.forEach(job => {
+            console.log(`  - ${job.title} (Recruiter: ${job.recruiter.name}, External: ${job.isExternal})`);
         });
 
         return NextResponse.json(jobs);

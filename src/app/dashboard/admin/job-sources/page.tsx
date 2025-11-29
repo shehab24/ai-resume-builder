@@ -244,6 +244,16 @@ export default function AdminJobSourcesPage() {
 
                             <div className="flex gap-2 pt-2">
                                 <Button
+                                    variant="default"
+                                    size="sm"
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                                    onClick={() => window.location.href = `/dashboard/admin/import-job?sourceId=${source.id}`}
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Import Job
+                                </Button>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
                                     variant={source.isActive ? "outline" : "default"}
                                     size="sm"
                                     className="flex-1"
