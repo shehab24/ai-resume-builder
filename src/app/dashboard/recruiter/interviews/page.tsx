@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Calendar, Clock, Video, User, Briefcase, ExternalLink, Users, UserPlus } from "lucide-react";
+import { Loader2, Calendar, Clock, Video, User, Briefcase, ExternalLink, Users, UserPlus, Crown } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { RecruiterSearch } from "@/components/recruiter-search";
+import { UpgradePrompt } from "@/components/upgrade-prompt";
 
 interface Interview {
     id: string;
@@ -43,6 +44,7 @@ interface Interview {
 export default function RecruiterInterviewsPage() {
     const [loading, setLoading] = useState(true);
     const [interviews, setInterviews] = useState<Interview[]>([]);
+    const [isPro, setIsPro] = useState(false);
 
     // Invite modal state
     const [showInviteModal, setShowInviteModal] = useState(false);
@@ -51,8 +53,21 @@ export default function RecruiterInterviewsPage() {
     const [inviting, setInviting] = useState(false);
 
     useEffect(() => {
+        fetchSubscriptionStatus();
         fetchInterviews();
     }, []);
+
+    const fetchSubscriptionStatus = async () => {
+        try {
+            const res = await fetch("/api/user/subscription");
+            if (res.ok) {
+                const data = await res.json();
+                setIsPro(data.subscription?.status === 'ACTIVE' && data.subscription?.plan === 'PRO');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     const fetchInterviews = async () => {
         try {
@@ -125,117 +140,136 @@ export default function RecruiterInterviewsPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold">Scheduled Interviews</h1>
-                <p className="text-muted-foreground mt-1">Manage your upcoming video interviews</p>
+                <div className="flex items-center gap-2">
+                    <h1 className="text-3xl font-bold">Scheduled Interviews</h1>
+                    {!isPro && (
+                        <Badge variant="secondary" className="bg-amber-200 text-amber-900">
+                            <Crown className="h-3 w-3 mr-1" />
+                            PRO FEATURE
+                        </Badge>
+                    )}
+                </div>
+                <p className="text-muted-foreground mt-1">
+                    {isPro ? 'Manage your upcoming video interviews' : 'Upgrade to Pro to schedule and manage video interviews'}
+                </p>
             </div>
 
-            {interviews.length === 0 ? (
-                <Card className="border-dashed">
-                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                        <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center mb-4">
-                            <Video className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                        </div>
-                        <h3 className="text-lg font-semibold">No interviews scheduled</h3>
-                        <p className="text-muted-foreground max-w-sm mt-2">
-                            Schedule interviews from the candidate's application page.
-                        </p>
-                        <Button className="mt-4" asChild>
-                            <Link href="/dashboard/recruiter/applications">View Applications</Link>
-                        </Button>
-                    </CardContent>
-                </Card>
+            {!isPro ? (
+                <UpgradePrompt
+                    title="Interview Scheduling - Pro Feature"
+                    message="Schedule video interviews with candidates and collaborate with your team."
+                    feature="Upgrade to Pro to unlock interview scheduling, panel invitations, and advanced collaboration tools!"
+                />
             ) : (
-                <div className="grid gap-4">
-                    {interviews.map((interview) => (
-                        <Card key={interview.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                            <CardContent className="p-0">
-                                <div className="flex flex-col md:flex-row">
-                                    {/* Date Column */}
-                                    <div className="bg-purple-50 dark:bg-purple-900/10 p-6 flex flex-col items-center justify-center min-w-[150px] border-b md:border-b-0 md:border-r border-purple-100 dark:border-purple-900/20">
-                                        <span className="text-3xl font-bold text-purple-700 dark:text-purple-400">
-                                            {new Date(interview.scheduledAt).getDate()}
-                                        </span>
-                                        <span className="text-sm font-medium text-purple-600 dark:text-purple-300 uppercase">
-                                            {new Date(interview.scheduledAt).toLocaleString('default', { month: 'short' })}
-                                        </span>
-                                        <div className="mt-2 flex items-center text-xs text-muted-foreground bg-white dark:bg-gray-800 px-2 py-1 rounded-full shadow-sm">
-                                            <Clock className="mr-1 h-3 w-3" />
-                                            {new Date(interview.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+
+                interviews.length === 0 ? (
+                    <Card className="border-dashed">
+                        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                            <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center mb-4">
+                                <Video className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <h3 className="text-lg font-semibold">No interviews scheduled</h3>
+                            <p className="text-muted-foreground max-w-sm mt-2">
+                                Schedule interviews from the candidate's application page.
+                            </p>
+                            <Button className="mt-4" asChild>
+                                <Link href="/dashboard/recruiter/applications">View Applications</Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="grid gap-4">
+                        {interviews.map((interview) => (
+                            <Card key={interview.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                                <CardContent className="p-0">
+                                    <div className="flex flex-col md:flex-row">
+                                        {/* Date Column */}
+                                        <div className="bg-purple-50 dark:bg-purple-900/10 p-6 flex flex-col items-center justify-center min-w-[150px] border-b md:border-b-0 md:border-r border-purple-100 dark:border-purple-900/20">
+                                            <span className="text-3xl font-bold text-purple-700 dark:text-purple-400">
+                                                {new Date(interview.scheduledAt).getDate()}
+                                            </span>
+                                            <span className="text-sm font-medium text-purple-600 dark:text-purple-300 uppercase">
+                                                {new Date(interview.scheduledAt).toLocaleString('default', { month: 'short' })}
+                                            </span>
+                                            <div className="mt-2 flex items-center text-xs text-muted-foreground bg-white dark:bg-gray-800 px-2 py-1 rounded-full shadow-sm">
+                                                <Clock className="mr-1 h-3 w-3" />
+                                                {new Date(interview.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Info Column */}
-                                    <div className="flex-1 p-6 flex flex-col justify-center">
-                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                                            <div>
-                                                <h3 className="font-semibold text-lg flex items-center gap-2">
-                                                    {interview.application.user.name}
-                                                    <Badge variant="secondary" className={getStatusColor(interview.status)}>
-                                                        {interview.status}
-                                                    </Badge>
-                                                </h3>
-                                                <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                                                    <span className="flex items-center gap-1">
-                                                        <Briefcase className="h-3 w-3" /> {interview.application.job.title}
-                                                    </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <Clock className="h-3 w-3" /> {interview.duration} mins
-                                                    </span>
-                                                </div>
-
-                                                {/* Panel Members */}
-                                                {interview.participants && interview.participants.length > 1 && (
-                                                    <div className="flex items-center gap-2 mt-2">
-                                                        <Users className="h-3 w-3 text-muted-foreground" />
-                                                        <div className="flex -space-x-2">
-                                                            {interview.participants
-                                                                .filter(p => p.role !== 'CANDIDATE')
-                                                                .slice(0, 3)
-                                                                .map((participant) => (
-                                                                    <Avatar key={participant.id} className="h-6 w-6 border-2 border-background">
-                                                                        <AvatarImage src={participant.user.photoUrl} />
-                                                                        <AvatarFallback className="text-xs bg-purple-100 text-purple-700">
-                                                                            {participant.user.name?.charAt(0) || 'R'}
-                                                                        </AvatarFallback>
-                                                                    </Avatar>
-                                                                ))}
-                                                        </div>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {interview.participants.filter(p => p.role !== 'CANDIDATE').length} interviewer(s)
+                                        {/* Info Column */}
+                                        <div className="flex-1 p-6 flex flex-col justify-center">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                                                <div>
+                                                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                                                        {interview.application.user.name}
+                                                        <Badge variant="secondary" className={getStatusColor(interview.status)}>
+                                                            {interview.status}
+                                                        </Badge>
+                                                    </h3>
+                                                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                                                        <span className="flex items-center gap-1">
+                                                            <Briefcase className="h-3 w-3" /> {interview.application.job.title}
+                                                        </span>
+                                                        <span className="flex items-center gap-1">
+                                                            <Clock className="h-3 w-3" /> {interview.duration} mins
                                                         </span>
                                                     </div>
-                                                )}
-                                            </div>
 
-                                            <div className="flex gap-2">
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/dashboard/recruiter/applications/${interview.application.id}`}>
-                                                        View Application
-                                                    </Link>
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => openInviteModal(interview)}
-                                                >
-                                                    <UserPlus className="mr-2 h-4 w-4" />
-                                                    Invite Recruiter
-                                                </Button>
-                                                {(interview.status === "SCHEDULED" || interview.status === "ACCEPTED") && (
-                                                    <Button size="sm" className="bg-purple-600 hover:bg-purple-700" asChild>
-                                                        <Link href={`/interview/${interview.id}`} target="_blank">
-                                                            <Video className="mr-2 h-4 w-4" /> Join Interview
+                                                    {/* Panel Members */}
+                                                    {interview.participants && interview.participants.length > 1 && (
+                                                        <div className="flex items-center gap-2 mt-2">
+                                                            <Users className="h-3 w-3 text-muted-foreground" />
+                                                            <div className="flex -space-x-2">
+                                                                {interview.participants
+                                                                    .filter(p => p.role !== 'CANDIDATE')
+                                                                    .slice(0, 3)
+                                                                    .map((participant) => (
+                                                                        <Avatar key={participant.id} className="h-6 w-6 border-2 border-background">
+                                                                            <AvatarImage src={participant.user.photoUrl} />
+                                                                            <AvatarFallback className="text-xs bg-purple-100 text-purple-700">
+                                                                                {participant.user.name?.charAt(0) || 'R'}
+                                                                            </AvatarFallback>
+                                                                        </Avatar>
+                                                                    ))}
+                                                            </div>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {interview.participants.filter(p => p.role !== 'CANDIDATE').length} interviewer(s)
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex gap-2">
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={`/dashboard/recruiter/applications/${interview.application.id}`}>
+                                                            View Application
                                                         </Link>
                                                     </Button>
-                                                )}
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => openInviteModal(interview)}
+                                                    >
+                                                        <UserPlus className="mr-2 h-4 w-4" />
+                                                        Invite Recruiter
+                                                    </Button>
+                                                    {(interview.status === "SCHEDULED" || interview.status === "ACCEPTED") && (
+                                                        <Button size="sm" className="bg-purple-600 hover:bg-purple-700" asChild>
+                                                            <Link href={`/interview/${interview.id}`} target="_blank">
+                                                                <Video className="mr-2 h-4 w-4" /> Join Interview
+                                                            </Link>
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                )
             )}
 
             {/* Invite Recruiter Modal */}

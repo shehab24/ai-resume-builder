@@ -83,7 +83,7 @@ export default function MyApplicationsPage() {
             setCodeContent("");
             setLinkUrl("");
             fetchApplications(); // Refresh list
-            // Don't close dialog immediately so they can see it was added
+            setSelectedApp(null); // Close dialog automatically
         } catch (error) {
             console.error(error);
             toast.error("Failed to submit task");

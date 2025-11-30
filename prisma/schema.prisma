@@ -42,6 +42,10 @@ model User {
   
   notifications Notification[]
   interviewParticipations InterviewParticipant[]
+  
+  // Payment relations
+  subscriptions Subscription[]
+  payments      Payment[]
 }
 
 model Notification {
@@ -228,4 +232,55 @@ model InterviewParticipant {
   @@unique([interviewId, userId])
   @@index([userId])
   @@index([interviewId])
+}
+
+model Subscription {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @db.ObjectId
+  plan            String   // "FREE" | "PRO" | "ENTERPRISE"
+  planType        String?  // "JOB_SEEKER_PRO" (299) | "RECRUITER_PRO" (999) | "ALL_FEATURES_PRO" (999)
+  status          String   // "ACTIVE" | "CANCELLED" | "EXPIRED"
+  amount          Float
+  currency        String   @default("BDT")
+  startDate       DateTime @default(now())
+  endDate         DateTime
+  autoRenew       Boolean  @default(true)
+  
+  user            User     @relation(fields: [userId], references: [id])
+  payments        Payment[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Payment {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String   @db.ObjectId
+  subscriptionId    String?  @db.ObjectId
+  
+  // SSLCommerz fields
+  transactionId     String   @unique  // tran_id
+  amount            Float
+  currency          String   @default("BDT")
+  status            String   // "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED"
+  paymentMethod     String?  // "card" | "bkash" | "rocket" etc.
+  
+  // SSLCommerz response
+  bankTransactionId String?  // bank_tran_id
+  cardType          String?
+  cardIssuer        String?
+  validationId      String?  // val_id
+  
+  // Metadata
+  description       String?
+  planType          String?  // "JOB_SEEKER_PRO" | "RECRUITER_PRO" | "ALL_FEATURES_PRO"
+  failureReason     String?
+  
+  user              User         @relation(fields: [userId], references: [id])
+  subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([userId])
 }

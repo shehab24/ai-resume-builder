@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Loader2, ArrowLeft, Mail, Calendar, ExternalLink, Code, Briefcase, GraduationCap, CheckCircle, XCircle, UserCheck, MessageSquare, Sparkles, Video } from "lucide-react";
+import { Loader2, ArrowLeft, Mail, Calendar, ExternalLink, Code, Briefcase, GraduationCap, CheckCircle, XCircle, UserCheck, MessageSquare, Sparkles, Video, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { RecruiterSearch } from "@/components/recruiter-search";
+import { useSubscription } from "@/hooks/use-subscription";
+import { UpgradePrompt } from "@/components/upgrade-prompt";
 
 interface ResumeContent {
     summary: string;
@@ -62,6 +64,8 @@ export default function ApplicationDetailsPage() {
     const [application, setApplication] = useState<Application | null>(null);
     const [generatingQuestions, setGeneratingQuestions] = useState(false);
     const [interviewQuestions, setInterviewQuestions] = useState<any>(null);
+    const [isPro, setIsPro] = useState(false);
+    const { subscribe, loading: subscribing } = useSubscription();
 
     // Interview scheduling state
     const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -73,7 +77,20 @@ export default function ApplicationDetailsPage() {
 
     useEffect(() => {
         fetchApplication();
+        fetchSubscriptionStatus();
     }, [applicationId]);
+
+    const fetchSubscriptionStatus = async () => {
+        try {
+            const res = await fetch("/api/user/subscription");
+            if (res.ok) {
+                const data = await res.json();
+                setIsPro(data.subscription?.status === 'ACTIVE' && data.subscription?.plan === 'PRO');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     // Auto-open schedule modal if ?schedule=true in URL
     useEffect(() => {
@@ -247,10 +264,12 @@ export default function ApplicationDetailsPage() {
                     </Button>
                     <Button
                         variant="outline"
-                        className="text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700"
-                        onClick={() => setShowScheduleModal(true)}
+                        className={`text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700 ${!isPro ? 'opacity-70' : ''}`}
+                        onClick={() => !isPro ? subscribe('PRO', 999) : setShowScheduleModal(true)}
+                        disabled={subscribing}
                     >
-                        <Video className="mr-2 h-4 w-4" /> Schedule Video Interview
+                        {!isPro ? <Crown className="mr-2 h-4 w-4" /> : <Video className="mr-2 h-4 w-4" />}
+                        {subscribing ? 'Processing...' : (!isPro ? 'Unlock Video Interview' : 'Schedule Video Interview')}
                     </Button>
                     <Button
                         variant="destructive"
@@ -314,25 +333,33 @@ export default function ApplicationDetailsPage() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {evaluation ? (
-                                <>
-                                    <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border">
-                                        <h3 className="font-semibold mb-2">AI Summary</h3>
-                                        <p className="text-sm text-muted-foreground">{evaluation.summary}</p>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
-                                            <h4 className="font-semibold text-green-700 dark:text-green-400 text-sm mb-1">Strengths</h4>
-                                            <p className="text-xs">{evaluation.strengths}</p>
-                                        </div>
-                                        <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
-                                            <h4 className="font-semibold text-red-700 dark:text-red-400 text-sm mb-1">Weaknesses</h4>
-                                            <p className="text-xs">{evaluation.weaknesses}</p>
-                                        </div>
-                                    </div>
-                                </>
+                            {!isPro ? (
+                                <UpgradePrompt
+                                    title="AI Task Evaluation"
+                                    message="Get instant AI-powered analysis of candidate task submissions."
+                                    feature="Upgrade to Pro to unlock detailed AI insights, strengths, and weaknesses analysis."
+                                />
                             ) : (
-                                <p className="text-muted-foreground italic">AI evaluation pending or not available.</p>
+                                evaluation ? (
+                                    <>
+                                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border">
+                                            <h3 className="font-semibold mb-2">AI Summary</h3>
+                                            <p className="text-sm text-muted-foreground">{evaluation.summary}</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                                                <h4 className="font-semibold text-green-700 dark:text-green-400 text-sm mb-1">Strengths</h4>
+                                                <p className="text-xs">{evaluation.strengths}</p>
+                                            </div>
+                                            <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+                                                <h4 className="font-semibold text-red-700 dark:text-red-400 text-sm mb-1">Weaknesses</h4>
+                                                <p className="text-xs">{evaluation.weaknesses}</p>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <p className="text-muted-foreground italic">AI evaluation pending or not available.</p>
+                                )
                             )}
                         </CardContent>
                     </Card>
@@ -457,97 +484,107 @@ export default function ApplicationDetailsPage() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {!interviewQuestions ? (
-                                <div className="text-center py-6">
-                                    <Sparkles className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
-                                    <p className="text-sm text-muted-foreground mb-4">
-                                        Generate personalized interview questions based on this candidate's profile
-                                    </p>
-                                    <Button
-                                        onClick={generateInterviewQuestions}
-                                        disabled={generatingQuestions}
-                                        className="w-full"
-                                    >
-                                        {generatingQuestions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        {generatingQuestions ? 'Generating...' : 'Generate Questions'}
-                                    </Button>
-                                </div>
+                            {!isPro ? (
+                                <UpgradePrompt
+                                    title="AI Interview Questions"
+                                    message="Generate tailored interview questions based on the candidate's specific profile and resume."
+                                    feature="Upgrade to Pro to automatically generate technical and behavioral questions."
+                                />
                             ) : (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <Badge variant="secondary" className="text-xs">
-                                            AI Generated
-                                        </Badge>
+                                !interviewQuestions ? (
+                                    <div className="text-center py-6">
+                                        <Sparkles className="h-12 w-12 mx-auto mb-3 text-muted-foreground" />
+                                        <p className="text-sm text-muted-foreground mb-4">
+                                            Generate personalized interview questions based on this candidate's profile
+                                        </p>
                                         <Button
-                                            variant="outline"
-                                            size="sm"
                                             onClick={generateInterviewQuestions}
                                             disabled={generatingQuestions}
+                                            className="w-full"
                                         >
-                                            {generatingQuestions ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Regenerate'}
+                                            {generatingQuestions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                            {generatingQuestions ? 'Generating...' : 'Generate Questions'}
                                         </Button>
                                     </div>
-
-                                    {/* Technical Questions */}
-                                    {interviewQuestions.technical && interviewQuestions.technical.length > 0 && (
-                                        <div className="space-y-2">
-                                            <h4 className="font-semibold text-sm text-blue-700 dark:text-blue-400">
-                                                Technical ({interviewQuestions.technical.length})
-                                            </h4>
-                                            <div className="space-y-3">
-                                                {interviewQuestions.technical.slice(0, 3).map((q: any, i: number) => (
-                                                    <div key={i} className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-900">
-                                                        <p className="text-sm font-medium mb-1">{q.question}</p>
-                                                        <p className="text-xs text-muted-foreground">{q.relevance}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <Badge variant="secondary" className="text-xs">
+                                                AI Generated
+                                            </Badge>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={generateInterviewQuestions}
+                                                disabled={generatingQuestions}
+                                            >
+                                                <Sparkles className="mr-2 h-3 w-3" />
+                                                Regenerate
+                                            </Button>
                                         </div>
-                                    )}
 
-                                    {/* Behavioral Questions */}
-                                    {interviewQuestions.behavioral && interviewQuestions.behavioral.length > 0 && (
-                                        <div className="space-y-2">
-                                            <h4 className="font-semibold text-sm text-green-700 dark:text-green-400">
-                                                Behavioral ({interviewQuestions.behavioral.length})
-                                            </h4>
-                                            <div className="space-y-3">
-                                                {interviewQuestions.behavioral.slice(0, 2).map((q: any, i: number) => (
-                                                    <div key={i} className="bg-green-50 dark:bg-green-900/20 p-3 rounded-md border border-green-100 dark:border-green-900">
-                                                        <p className="text-sm font-medium mb-1">{q.question}</p>
-                                                        <p className="text-xs text-muted-foreground">{q.relevance}</p>
-                                                    </div>
-                                                ))}
+                                        {/* Technical Questions */}
+                                        {interviewQuestions.technical && interviewQuestions.technical.length > 0 && (
+                                            <div className="space-y-2">
+                                                <h4 className="font-semibold text-sm text-blue-700 dark:text-blue-400">
+                                                    Technical ({interviewQuestions.technical.length})
+                                                </h4>
+                                                <div className="space-y-3">
+                                                    {interviewQuestions.technical.slice(0, 3).map((q: any, i: number) => (
+                                                        <div key={i} className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-900">
+                                                            <p className="text-sm font-medium mb-1">{q.question}</p>
+                                                            <p className="text-xs text-muted-foreground">{q.relevance}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {/* Problem Solving */}
-                                    {interviewQuestions.problemSolving && interviewQuestions.problemSolving.length > 0 && (
-                                        <div className="space-y-2">
-                                            <h4 className="font-semibold text-sm text-purple-700 dark:text-purple-400">
-                                                Problem Solving ({interviewQuestions.problemSolving.length})
-                                            </h4>
-                                            <div className="space-y-3">
-                                                {interviewQuestions.problemSolving.slice(0, 2).map((q: any, i: number) => (
-                                                    <div key={i} className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-md border border-purple-100 dark:border-purple-900">
-                                                        <p className="text-sm font-medium mb-1">{q.question}</p>
-                                                        <p className="text-xs text-muted-foreground">{q.relevance}</p>
-                                                    </div>
-                                                ))}
+                                        {/* Behavioral Questions */}
+                                        {interviewQuestions.behavioral && interviewQuestions.behavioral.length > 0 && (
+                                            <div className="space-y-2">
+                                                <h4 className="font-semibold text-sm text-green-700 dark:text-green-400">
+                                                    Behavioral ({interviewQuestions.behavioral.length})
+                                                </h4>
+                                                <div className="space-y-3">
+                                                    {interviewQuestions.behavioral.slice(0, 2).map((q: any, i: number) => (
+                                                        <div key={i} className="bg-green-50 dark:bg-green-900/20 p-3 rounded-md border border-green-100 dark:border-green-900">
+                                                            <p className="text-sm font-medium mb-1">{q.question}</p>
+                                                            <p className="text-xs text-muted-foreground">{q.relevance}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    <Button variant="outline" className="w-full mt-4" size="sm">
-                                        View All Questions
-                                    </Button>
-                                </div>
+                                        {/* Problem Solving */}
+                                        {interviewQuestions.problemSolving && interviewQuestions.problemSolving.length > 0 && (
+                                            <div className="space-y-2">
+                                                <h4 className="font-semibold text-sm text-purple-700 dark:text-purple-400">
+                                                    Problem Solving ({interviewQuestions.problemSolving.length})
+                                                </h4>
+                                                <div className="space-y-3">
+                                                    {interviewQuestions.problemSolving.slice(0, 2).map((q: any, i: number) => (
+                                                        <div key={i} className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-md border border-purple-100 dark:border-purple-900">
+                                                            <p className="text-sm font-medium mb-1">{q.question}</p>
+                                                            <p className="text-xs text-muted-foreground">{q.relevance}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            )}
+                            {isPro && interviewQuestions && (
+                                <Button variant="outline" className="w-full mt-4" size="sm">
+                                    View All Questions
+                                </Button>
                             )}
                         </CardContent>
-                    </Card>
-                </div>
-            </div>
+                    </Card >
+                </div >
+            </div >
 
             {/* Schedule Interview Modal */}
             <Dialog open={showScheduleModal} onOpenChange={setShowScheduleModal}>
@@ -615,7 +652,7 @@ export default function ApplicationDetailsPage() {
                         </Button>
                     </div>
                 </DialogContent>
-            </Dialog>
-        </div>
+            </Dialog >
+        </div >
     );
 }

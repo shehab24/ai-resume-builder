@@ -3,13 +3,18 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, FileText, Briefcase, CheckCircle } from "lucide-react";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { PricingSection } from "@/components/pricing-section";
+import { BkashRedirectHandler } from "@/components/bkash-redirect-handler";
+import { Suspense } from "react";
 
 export default async function Home() {
   const { userId } = await auth();
-  const dashboardLink = userId ? "/dashboard/job-seeker" : "/sign-in"; // Default to job seeker, middleware/onboarding handles role check ideally
 
   return (
     <div className="flex flex-col min-h-screen">
+      <Suspense fallback={null}>
+        <BkashRedirectHandler />
+      </Suspense>
       {/* Header */}
       <header className="px-6 lg:px-12 h-16 flex items-center justify-between border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="flex items-center gap-2 font-bold text-xl text-primary">
@@ -104,6 +109,9 @@ export default async function Home() {
             </div>
           </div>
         </section>
+
+        {/* Pricing Section */}
+        <PricingSection />
       </main>
 
       {/* Footer */}

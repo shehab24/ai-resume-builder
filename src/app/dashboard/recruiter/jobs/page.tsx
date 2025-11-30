@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Briefcase, MapPin, DollarSign, Trash2, Pencil, Users, Trophy, Calendar } from "lucide-react";
+import { Loader2, Briefcase, MapPin, DollarSign, Trash2, Pencil, Users, Trophy, Calendar, Crown } from "lucide-react";
 import { toast } from "sonner";
+import { useSubscription } from "@/hooks/use-subscription";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -43,10 +44,25 @@ export default function RecruiterJobsPage() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [jobToDelete, setJobToDelete] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isPro, setIsPro] = useState(false);
+    const { subscribe, loading: subscribing } = useSubscription();
 
     useEffect(() => {
         fetchJobs();
+        fetchSubscriptionStatus();
     }, []);
+
+    const fetchSubscriptionStatus = async () => {
+        try {
+            const res = await fetch("/api/user/subscription");
+            if (res.ok) {
+                const data = await res.json();
+                setIsPro(data.subscription?.status === 'ACTIVE' && data.subscription?.plan === 'PRO');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     const fetchJobs = async () => {
         try {
@@ -219,11 +235,12 @@ export default function RecruiterJobsPage() {
                                     <Button
                                         variant="secondary"
                                         size="sm"
-                                        className="w-full shadow-md hover:shadow-lg transition-shadow"
-                                        onClick={() => router.push(`/dashboard/recruiter/jobs/${job.id}/candidates`)}
+                                        className={`w-full shadow-md hover:shadow-lg transition-shadow ${!isPro ? 'bg-amber-100 text-amber-900 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-100' : ''}`}
+                                        onClick={() => !isPro ? subscribe('PRO', 999) : router.push(`/dashboard/recruiter/jobs/${job.id}/candidates`)}
+                                        disabled={subscribing}
                                     >
-                                        <Trophy className="h-3.5 w-3.5 mr-1.5" />
-                                        Rankings
+                                        {!isPro ? <Crown className="h-3.5 w-3.5 mr-1.5" /> : <Trophy className="h-3.5 w-3.5 mr-1.5" />}
+                                        {subscribing ? 'Processing...' : (!isPro ? 'Unlock Rankings' : 'Rankings')}
                                     </Button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">

@@ -1,31 +1,92 @@
 /* Print styles for resume PDF export */
 @media print {
+
     /* Hide everything except the resume */
-    body > div:first-child,
-    header,
-    aside,
-    nav,
-    .print\:hidden {
-        display: none !important;
+    body * {
+        visibility: hidden;
     }
-    
-    /* Show only the resume card */
-    #resume-card {
-        display: block !important;
-        box-shadow: none !important;
-        border: none !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-    
-    /* Ensure resume card is visible */
+
+    /* Show only the resume card and its children */
     #resume-card,
     #resume-card * {
-        visibility: visible !important;
+        visibility: visible;
     }
-    
-    /* Reset page margins for PDF */
+
+    /* Position resume card at absolute top */
+    #resume-card {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        overflow: visible !important;
+    }
+
+    /* Remove all padding from Card and CardContent */
+    #resume-card>*,
+    #resume-card [class*="card"],
+    #resume-card [class*="Card"] {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Set page margins - remove all gaps */
     @page {
-        margin: 0.5in;
+        margin: 15mm 0;
+        size: auto;
+    }
+
+    html,
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+        background: white !important;
+    }
+
+    /* Force background colors to print */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Add consistent spacing between sections */
+    #resume-card>*>* {
+        margin-bottom: 10px !important;
+    }
+
+    /* Add top spacing to section headings */
+    #resume-card h2 {
+        margin-top: 16px !important;
+    }
+
+    /* Remove top margin from first section heading */
+    #resume-card>*>*:first-child h2:first-child,
+    #resume-card h2:first-of-type {
+        margin-top: 0 !important;
+    }
+
+    /* Avoid breaking content across pages awkwardly */
+    h2,
+    h3 {
+        break-after: avoid;
+    }
+
+    p,
+    li {
+        break-inside: avoid;
+    }
+
+    .space-y-4>div {
+        break-inside: avoid;
+    }
+
+    /* Hide scrollbars */
+    ::-webkit-scrollbar {
+        display: none;
     }
 }

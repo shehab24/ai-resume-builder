@@ -5,9 +5,10 @@ import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Star, TrendingUp, User, Mail, Award, CheckCircle2 } from "lucide-react";
+import { Loader2, Star, TrendingUp, User, Mail, Award, CheckCircle2, Crown, Video } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useSubscription } from "@/hooks/use-subscription";
 
 interface Application {
     id: string;
@@ -34,10 +35,25 @@ export default function JobApplicationsPage() {
     const [topCandidates, setTopCandidates] = useState<Application[]>([]);
     const [otherCandidates, setOtherCandidates] = useState<Application[]>([]);
     const [stats, setStats] = useState({ total: 0, topCandidates: 0, withScores: 0 });
+    const [isPro, setIsPro] = useState(false);
+    const { subscribe, loading: subscribing } = useSubscription();
 
     useEffect(() => {
         fetchApplications();
+        fetchSubscriptionStatus();
     }, [jobId]);
+
+    const fetchSubscriptionStatus = async () => {
+        try {
+            const res = await fetch("/api/user/subscription");
+            if (res.ok) {
+                const data = await res.json();
+                setIsPro(data.subscription?.status === 'ACTIVE' && data.subscription?.plan === 'PRO');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
     const fetchApplications = async () => {
         try {
@@ -140,11 +156,24 @@ export default function JobApplicationsPage() {
                                 View Details
                             </Link>
                         </Button>
-                        <Button variant="outline" className="flex-1" asChild>
-                            <Link href={`/dashboard/recruiter/applications/${app.id}?schedule=true`}>
-                                Schedule Interview
-                            </Link>
-                        </Button>
+                        {isPro ? (
+                            <Button variant="outline" className="flex-1" asChild>
+                                <Link href={`/dashboard/recruiter/applications/${app.id}?schedule=true`}>
+                                    <Video className="mr-2 h-4 w-4" />
+                                    Schedule Interview
+                                </Link>
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="outline"
+                                className="flex-1 bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-100 dark:border-amber-800"
+                                onClick={() => subscribe('PRO', 999)}
+                                disabled={subscribing}
+                            >
+                                <Crown className="mr-2 h-4 w-4" />
+                                {subscribing ? 'Processing...' : 'Unlock Interview'}
+                            </Button>
+                        )}
                     </div>
                 </CardContent>
             </Card>

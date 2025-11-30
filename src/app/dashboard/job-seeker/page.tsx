@@ -1,12 +1,34 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/prisma";
+import { SubscriptionStatus } from "@/components/dashboard/subscription-status";
 
-export default function JobSeekerDashboard() {
+export default async function JobSeekerDashboard() {
+    const { userId } = await auth();
+
+    if (!userId) return null;
+
+    const user = await prisma.user.findUnique({
+        where: { clerkId: userId },
+        include: {
+            subscriptions: {
+                where: { status: 'ACTIVE' },
+                orderBy: { endDate: 'desc' },
+                take: 1
+            }
+        }
+    });
+
+    const subscription = user?.subscriptions[0];
+
     return (
         <div className="space-y-6">
             <h2 className="text-3xl font-bold tracking-tight">Welcome back!</h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <SubscriptionStatus subscription={subscription} />
+
                 <Card>
                     <CardHeader>
                         <CardTitle>My Resumes</CardTitle>

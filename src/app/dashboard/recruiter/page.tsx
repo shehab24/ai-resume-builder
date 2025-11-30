@@ -5,26 +5,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { SubscriptionStatus } from "@/components/dashboard/subscription-status";
 
 export default function RecruiterDashboard() {
     const [stats, setStats] = useState({ activeJobs: 0, totalApplications: 0 });
+    const [subscription, setSubscription] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchStats = async () => {
+        const fetchData = async () => {
             try {
-                const res = await fetch("/api/recruiter/stats");
-                if (res.ok) {
-                    const data = await res.json();
+                const [statsRes, subRes] = await Promise.all([
+                    fetch("/api/recruiter/stats"),
+                    fetch("/api/user/subscription")
+                ]);
+
+                if (statsRes.ok) {
+                    const data = await statsRes.json();
                     setStats(data);
                 }
+
+                if (subRes.ok) {
+                    const data = await subRes.json();
+                    setSubscription(data.subscription);
+                }
             } catch (error) {
-                console.error("Error fetching stats:", error);
+                console.error("Error fetching dashboard data:", error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchStats();
+        fetchData();
     }, []);
 
     if (loading) {
@@ -39,6 +50,7 @@ export default function RecruiterDashboard() {
         <div className="space-y-6">
             <h2 className="text-3xl font-bold tracking-tight">Recruiter Dashboard</h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <SubscriptionStatus subscription={subscription} />
                 <Card>
                     <CardHeader>
                         <CardTitle>Active Jobs</CardTitle>

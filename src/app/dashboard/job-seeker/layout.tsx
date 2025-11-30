@@ -62,7 +62,7 @@ export default function JobSeekerLayout({
         };
 
         checkProfile();
-    }, []);
+    }, [pathname]); // Re-check when pathname changes
 
     return (
         <div className="flex min-h-screen bg-gray-100">

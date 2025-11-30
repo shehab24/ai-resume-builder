@@ -7,12 +7,16 @@ import { Briefcase, Users, PlusCircle, User, Video } from "lucide-react";
 import { useEffect } from "react";
 import { Notifications } from "@/components/Notifications";
 import { RoleSwitcher } from "@/components/RoleSwitcher";
+import { useSubscription } from "@/hooks/use-subscription-status";
+import { Badge } from "@/components/ui/badge";
 
 export default function RecruiterLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const { isPro } = useSubscription();
+
     useEffect(() => {
         const checkProfile = async () => {
             try {
@@ -79,9 +83,16 @@ export default function RecruiterLayout({
                         </Link>
                     </Button>
                     <Button variant="ghost" className="w-full justify-start" asChild>
-                        <Link href="/dashboard/recruiter/interviews">
-                            <Video className="mr-2 h-4 w-4" />
-                            Interviews
+                        <Link href="/dashboard/recruiter/interviews" className="flex items-center justify-between">
+                            <div className="flex items-center">
+                                <Video className="mr-2 h-4 w-4" />
+                                Interviews
+                            </div>
+                            {!isPro && (
+                                <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px] bg-amber-200 text-amber-900 pointer-events-none">
+                                    PRO
+                                </Badge>
+                            )}
                         </Link>
                     </Button>
                     <Button variant="ghost" className="w-full justify-start" asChild>

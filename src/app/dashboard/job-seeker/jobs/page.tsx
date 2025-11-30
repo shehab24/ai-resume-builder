@@ -5,8 +5,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, MapPin, DollarSign, Zap, Briefcase, Calendar, ExternalLink, Clock } from "lucide-react";
+import { Loader2, MapPin, DollarSign, Zap, Briefcase, Calendar, ExternalLink, Clock, Crown } from "lucide-react";
 import { toast } from "sonner";
+import { UpgradePrompt } from "@/components/upgrade-prompt";
+import { useSubscription } from "@/hooks/use-subscription";
 
 interface Job {
     id: string;
@@ -30,12 +32,15 @@ export default function FindJobsPage() {
     const [loading, setLoading] = useState(true);
     const [autoApply, setAutoApply] = useState(false);
     const [updatingAutoApply, setUpdatingAutoApply] = useState(false);
+    const [isPro, setIsPro] = useState(false);
+    const { subscribe, loading: subscribing } = useSubscription();
 
     const [matchThreshold, setMatchThreshold] = useState(95);
 
     useEffect(() => {
         fetchJobs();
         fetchAutoApplyStatus();
+        fetchSubscriptionStatus();
     }, []);
 
     const fetchJobs = async () => {
@@ -64,7 +69,24 @@ export default function FindJobsPage() {
         }
     };
 
+    const fetchSubscriptionStatus = async () => {
+        try {
+            const res = await fetch("/api/user/subscription");
+            if (res.ok) {
+                const data = await res.json();
+                setIsPro(data.subscription?.status === 'ACTIVE' && data.subscription?.plan === 'PRO');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
     const handleAutoApplyToggle = async (checked: boolean) => {
+        if (!isPro && checked) {
+            toast.error("Auto-Apply is a Pro feature! Upgrade to enable it.");
+            return;
+        }
+
         setUpdatingAutoApply(true);
         try {
             const res = await fetch("/api/user/profile", {
@@ -106,33 +128,61 @@ export default function FindJobsPage() {
                 </div>
 
                 {/* Auto-Apply Toggle */}
-                <Card className="border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 shadow-lg">
+                <Card className={`border-2 shadow-lg ${isPro ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950' : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950'}`}>
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <Zap className="h-5 w-5 text-blue-600" />
+                            {isPro ? (
+                                <Zap className="h-5 w-5 text-blue-600" />
+                            ) : (
+                                <Crown className="h-5 w-5 text-amber-600" />
+                            )}
                             <div className="flex-1">
-                                <p className="font-semibold text-sm text-blue-900 dark:text-blue-100">
-                                    Auto-Apply
-                                </p>
-                                <p className="text-xs text-blue-700 dark:text-blue-300">
-                                    {autoApply ? "Enabled" : "Disabled"}
+                                <div className="flex items-center gap-2">
+                                    <p className={`font-semibold text-sm ${isPro ? 'text-blue-900 dark:text-blue-100' : 'text-amber-900 dark:text-amber-100'}`}>
+                                        Auto-Apply
+                                    </p>
+                                    {!isPro && (
+                                        <Badge variant="secondary" className="text-[10px] bg-amber-200 text-amber-900">
+                                            PRO
+                                        </Badge>
+                                    )}
+                                </div>
+                                <p className={`text-xs ${isPro ? 'text-blue-700 dark:text-blue-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                                    {isPro ? (autoApply ? "Enabled" : "Disabled") : "Upgrade to Pro to enable"}
                                 </p>
                             </div>
                             <input
                                 type="checkbox"
                                 checked={autoApply}
-                                disabled={updatingAutoApply}
+                                disabled={updatingAutoApply || !isPro}
                                 onChange={(e) => handleAutoApplyToggle(e.target.checked)}
-                                className="w-12 h-6 rounded-full appearance-none bg-gray-300 checked:bg-blue-600 relative transition-colors
+                                className={`w-12 h-6 rounded-full appearance-none relative transition-colors
                                            before:content-[''] before:absolute before:w-5 before:h-5 before:rounded-full before:bg-white 
                                            before:top-0.5 before:left-0.5 before:transition-transform checked:before:translate-x-6
-                                           disabled:opacity-50 disabled:cursor-not-allowed"
+                                           disabled:opacity-50 disabled:cursor-not-allowed
+                                           ${isPro ? 'bg-gray-300 checked:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'}`}
                             />
                         </div>
-                        {autoApply && (
+                        {isPro && autoApply && (
                             <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
                                 ✓ We'll auto-apply to {matchThreshold}%+ matching jobs
                             </p>
+                        )}
+                        {!isPro && (
+                            <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800">
+                                <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                                    Unlock Auto-Apply and apply to hundreds of jobs automatically!
+                                </p>
+                                <Button
+                                    onClick={() => subscribe('PRO', 299)}
+                                    disabled={subscribing}
+                                    size="sm"
+                                    className="w-full bg-amber-600 hover:bg-amber-700"
+                                >
+                                    <Crown className="h-3 w-3 mr-1" />
+                                    {subscribing ? 'Processing...' : 'Upgrade to Pro - ৳299/month'}
+                                </Button>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
