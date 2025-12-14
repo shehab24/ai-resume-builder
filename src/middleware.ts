@@ -9,12 +9,17 @@ const isPublicRoute = createRouteMatcher([
   '/webhooks(.*)',
 ]);
 
-export default clerkMiddleware((auth, req) => {
+export default clerkMiddleware(async (auth, req) => {
+  const { userId } = await auth();
 
-
-  if (!isPublicRoute(req)) {
-    auth.protect();
+  // If route is not public and user is not authenticated, redirect to sign-in
+  if (!isPublicRoute(req) && !userId) {
+    const signInUrl = new URL('/sign-in', req.url);
+    signInUrl.searchParams.set('redirect_url', req.url);
+    return NextResponse.redirect(signInUrl);
   }
+
+  return NextResponse.next();
 });
 
 export const config = {

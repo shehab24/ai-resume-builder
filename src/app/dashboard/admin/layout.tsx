@@ -179,13 +179,14 @@ export default function AdminLayout({
                             afterSignOutUrl="/"
                             appearance={{
                                 elements: {
-                                    avatarBox: "w-10 h-10"
+                                    avatarBox: "w-10 h-10 ring-2 ring-gray-300 dark:ring-gray-600",
+                                    userButtonPopoverCard: "shadow-xl",
                                 }
                             }}
                         />
                         <div className="flex-1 min-w-0">
                             <p className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">Admin</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Super User</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Click avatar to logout</p>
                         </div>
                     </div>
                 </div>

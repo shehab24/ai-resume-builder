@@ -22,17 +22,27 @@ export default function OnboardingPage() {
                 if (res.ok) {
                     const data = await res.json();
 
+                    console.log("[Onboarding] User check response:", data);
+
                     // If user exists and has a role, redirect to their dashboard
                     if (data.exists && data.role) {
+                        console.log("[Onboarding] User has role:", data.role);
                         if (data.role === "ADMIN") {
+                            console.log("[Onboarding] Redirecting to admin dashboard");
                             router.push("/dashboard/admin");
                         } else if (data.role === "RECRUITER") {
+                            console.log("[Onboarding] Redirecting to recruiter dashboard");
                             router.push("/dashboard/recruiter");
                         } else {
+                            console.log("[Onboarding] Redirecting to job seeker dashboard");
                             router.push("/dashboard/job-seeker");
                         }
                         return;
+                    } else {
+                        console.log("[Onboarding] User does not exist or has no role");
                     }
+                } else {
+                    console.error("[Onboarding] API check failed:", res.status);
                 }
             } catch (error) {
                 console.error("Error checking role:", error);
@@ -42,7 +52,10 @@ export default function OnboardingPage() {
         };
 
         if (user) {
+            console.log("[Onboarding] Clerk user loaded, checking role...");
             checkExistingRole();
+        } else {
+            console.log("[Onboarding] No Clerk user yet");
         }
     }, [user, router]);
 
