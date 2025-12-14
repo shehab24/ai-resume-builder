@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     console.log('Payment ID:', paymentID);
     console.log('Status:', status);
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
 
     if (!paymentID) {
         console.log('❌ Missing paymentID');

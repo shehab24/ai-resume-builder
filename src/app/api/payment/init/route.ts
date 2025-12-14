@@ -83,13 +83,13 @@ export async function POST(req: Request) {
         const token = await getBkashToken();
 
         // Create payment
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
         const appKey = process.env.BKASH_APP_KEY!;
 
         const bKashRequestBody = {
             mode: '0011',
             payerReference: invoiceNumber,
-            callbackURL: 'http://localhost:3000',
+            callbackURL: `${baseUrl}/webhooks/payment/bkash/callback`,
             amount: amount.toString(),
             currency: 'BDT',
             intent: 'sale',

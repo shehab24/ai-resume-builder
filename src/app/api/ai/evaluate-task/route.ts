@@ -40,7 +40,7 @@ export async function POST(req: Request) {
             // Not a URL, treat as code/text
         }
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const prompt = `You are an expert technical recruiter evaluating a candidate's task submission.
 

@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
         const { resumeContent, jobTitle, jobRequirements, currentNotes } = await req.json();
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const prompt = `You are an expert technical recruiter. Based on the candidate's resume, job requirements, and any interview notes provided, generate or update the interview evaluation form.
 

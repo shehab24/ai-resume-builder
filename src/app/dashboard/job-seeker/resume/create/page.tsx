@@ -132,10 +132,40 @@ export default function CreateResumePage() {
                 body: JSON.stringify({ prompt, templateId: selectedTemplate }),
             });
 
-            if (!response.ok) throw new Error("Failed to generate resume");
-
             const data = await response.json();
-            toast.success("Resume generated successfully!");
+
+            if (!response.ok) {
+                // Handle specific error types
+                if (data.errorType === "API_KEY_ERROR") {
+                    toast.error("🔑 API Key Error", {
+                        description: data.message || "Your Gemini API key is invalid or expired.",
+                        duration: 6000,
+                    });
+                } else if (data.errorType === "QUOTA_ERROR") {
+                    toast.error("⚠️ Quota Exceeded", {
+                        description: data.message || "You've exceeded your API quota. Please try again later.",
+                        duration: 6000,
+                    });
+                } else if (data.errorType === "MODEL_ERROR") {
+                    toast.error("🤖 Model Error", {
+                        description: data.message || "The AI model is not available.",
+                        duration: 6000,
+                    });
+                } else if (data.errorType === "NETWORK_ERROR") {
+                    toast.error("🌐 Network Error", {
+                        description: data.message || "Unable to connect. Check your internet connection.",
+                        duration: 6000,
+                    });
+                } else {
+                    toast.error("❌ Error", {
+                        description: data.message || "Failed to generate resume. Please try again.",
+                        duration: 5000,
+                    });
+                }
+                return;
+            }
+
+            toast.success("✅ Resume generated successfully!");
 
             // Clear draft
             localStorage.removeItem("resume_prompt_draft");
@@ -145,7 +175,10 @@ export default function CreateResumePage() {
             window.location.href = `/dashboard/job-seeker/resume/${data.resumeId}`;
         } catch (error) {
             console.error(error);
-            toast.error("Failed to generate resume. Please try again.");
+            toast.error("❌ Unexpected Error", {
+                description: "Something went wrong. Please try again.",
+                duration: 5000,
+            });
         } finally {
             setIsGenerating(false);
         }

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
     // Initialize Gemini AI
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const promptText = `
         Generate a professional resume in JSON format based on the following user description:
@@ -163,8 +163,48 @@ export async function POST(req: Request) {
     console.log("Resume generation - Resume created:", resume.id);
 
     return NextResponse.json({ resumeId: resume.id, data: resumeData });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error generating resume:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+
+    // Handle different types of errors
+    if (error.status === 401 || error.message?.includes("API key")) {
+      return NextResponse.json({
+        error: "Invalid API Key",
+        message: "Your Gemini API key is invalid or expired. Please check your API key in the .env file.",
+        errorType: "API_KEY_ERROR"
+      }, { status: 401 });
+    }
+
+    if (error.status === 429 || error.message?.includes("quota") || error.message?.includes("rate limit")) {
+      return NextResponse.json({
+        error: "Quota Exceeded",
+        message: "You've exceeded your Gemini API quota. Please wait or upgrade your plan.",
+        errorType: "QUOTA_ERROR",
+        retryAfter: error.retryAfter || "Please try again later"
+      }, { status: 429 });
+    }
+
+    if (error.status === 404 || error.message?.includes("not found")) {
+      return NextResponse.json({
+        error: "Model Not Found",
+        message: "The AI model is not available. Please contact support.",
+        errorType: "MODEL_ERROR"
+      }, { status: 404 });
+    }
+
+    if (error.message?.includes("network") || error.message?.includes("fetch")) {
+      return NextResponse.json({
+        error: "Network Error",
+        message: "Unable to connect to AI service. Please check your internet connection.",
+        errorType: "NETWORK_ERROR"
+      }, { status: 503 });
+    }
+
+    // Generic error
+    return NextResponse.json({
+      error: "Internal Server Error",
+      message: "An unexpected error occurred. Please try again.",
+      errorType: "UNKNOWN_ERROR"
+    }, { status: 500 });
   }
 }
