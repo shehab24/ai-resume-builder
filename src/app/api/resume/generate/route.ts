@@ -38,74 +38,86 @@ export async function POST(req: Request) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const promptText = `
-        Generate a professional resume in JSON format based on the following user description:
+        You are a professional resume writer. Generate a polished, ATS-friendly resume in JSON format based on the following user input:
         "${prompt}"
+
+        IMPORTANT INSTRUCTIONS:
+        1. **Professional Summary**: Create a compelling 2-3 sentence professional summary that highlights key strengths, experience, and career goals. DO NOT copy the user's input verbatim - synthesize and professionalize it.
+        2. **Experience Descriptions**: Write clear, achievement-focused bullet points using action verbs (e.g., "Developed", "Managed", "Increased").
+        3. **Skills**: Extract and categorize relevant technical and soft skills.
+        4. **Formatting**: Use proper capitalization, grammar, and professional language throughout.
 
         The JSON must strictly follow this schema:
         {
           "personalInfo": {
-            "fullName": "string (use user's name if not provided: ${dbUser.name || user.firstName + " " + user.lastName})",
-            "email": "string (use user's email if not provided: ${dbUser.email})",
-            "phone": "string",
-            "linkedin": "string",
-            "portfolio": "string",
-            "address": "string"
+            "fullName": "string (use user's name if provided, otherwise: ${dbUser.name || user.firstName + " " + user.lastName})",
+            "email": "string (use user's email if provided, otherwise: ${dbUser.email})",
+            "phone": "string (extract from input or leave empty)",
+            "linkedin": "string (extract from input or leave empty)",
+            "portfolio": "string (extract from input or leave empty)",
+            "address": "string (extract from input or leave empty)"
           },
-          "summary": "string (professional summary inferred from description)",
+          "summary": "string (2-3 sentences, professionally written, highlighting key strengths and career objectives - DO NOT copy user input directly)",
           "experience": [
             {
-              "title": "string",
-              "company": "string",
-              "startDate": "string (YYYY-MM or Present)",
-              "endDate": "string (YYYY-MM or Present)",
-              "description": "string (bullet points or paragraph)"
+              "title": "string (job title)",
+              "company": "string (company name)",
+              "startDate": "string (YYYY-MM format)",
+              "endDate": "string (YYYY-MM or 'Present')",
+              "description": "string (3-5 achievement-focused bullet points separated by newlines, starting with action verbs)"
             }
           ],
           "education": [
             {
-              "degree": "string",
-              "school": "string",
-              "graduationDate": "string (YYYY)"
+              "degree": "string (e.g., Bachelor of Science in Computer Science)",
+              "school": "string (institution name)",
+              "graduationDate": "string (YYYY format)"
             }
           ],
-          "skills": ["string"],
+          "skills": ["string (categorized: technical skills, soft skills, tools, languages)"],
           "projects": [
             {
-                "name": "string",
-                "description": "string",
-                "technologies": ["string"],
-                "link": "string",
-                "startDate": "string",
-                "endDate": "string"
+                "name": "string (project name)",
+                "description": "string (brief, professional description of the project and your role)",
+                "technologies": ["string (technologies used)"],
+                "link": "string (project URL if available)",
+                "startDate": "string (YYYY-MM)",
+                "endDate": "string (YYYY-MM or 'Present')"
             }
           ],
           "certifications": [
             {
-                "name": "string",
-                "issuer": "string",
-                "date": "string",
-                "credentialId": "string"
+                "name": "string (certification name)",
+                "issuer": "string (issuing organization)",
+                "date": "string (YYYY-MM)",
+                "credentialId": "string (credential ID if available)"
             }
           ],
           "languages": [
             {
-                "name": "string",
-                "proficiency": "string"
+                "name": "string (language name)",
+                "proficiency": "string (Native, Fluent, Professional, Intermediate, Basic)"
             }
           ],
           "awards": [
             {
-                "title": "string",
-                "issuer": "string",
-                "date": "string",
-                "description": "string"
+                "title": "string (award title)",
+                "issuer": "string (issuing organization)",
+                "date": "string (YYYY-MM)",
+                "description": "string (brief description)"
             }
           ]
         }
 
-        If specific details (like phone, linkedin) are missing in the description, use empty strings.
-        Infer skills, experience, and summary intelligently from the provided text.
-        Return ONLY the JSON string, no markdown formatting or code blocks.
+        QUALITY GUIDELINES:
+        - Use professional, concise language
+        - Quantify achievements where possible (e.g., "Increased sales by 30%")
+        - Start experience descriptions with strong action verbs
+        - Ensure all dates are in proper format (YYYY-MM)
+        - If information is missing, use empty strings or empty arrays
+        - Make the summary compelling and unique to the candidate
+        
+        Return ONLY the JSON string, no markdown formatting, no code blocks, no explanations.
         `;
 
     console.log("Generating resume with Gemini...");
