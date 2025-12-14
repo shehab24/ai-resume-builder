@@ -18,19 +18,15 @@ export async function GET() {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        // Fetch all jobs EXCEPT those posted by the current user
-        // For MongoDB: sourceId null check needs special handling
-        const allJobsNotByUser = await prisma.job.findMany({
-            where: {
-                recruiterId: {
-                    not: user.id
-                }
-            },
+        // Fetch all jobs (including those posted by the current user)
+        // Recruiters can see their own jobs when they switch to job seeker role
+        const allJobs = await prisma.job.findMany({
             include: {
                 recruiter: {
                     select: {
                         name: true,
-                        email: true
+                        email: true,
+                        id: true
                     }
                 },
                 source: {
@@ -44,7 +40,7 @@ export async function GET() {
         });
 
         // Filter in JavaScript: show internal jobs OR external jobs from active sources
-        const jobs = allJobsNotByUser.filter(job => {
+        const jobs = allJobs.filter(job => {
             if (!job.sourceId) {
                 // Internal job - always show
                 return true;
@@ -55,9 +51,10 @@ export async function GET() {
         });
 
         console.log(`[Jobs API] User: ${user.email} (ID: ${user.id})`);
-        console.log(`[Jobs API] Found ${jobs.length} jobs (filtered from ${allJobsNotByUser.length} total)`);
+        console.log(`[Jobs API] Found ${jobs.length} jobs (filtered from ${allJobs.length} total)`);
         jobs.forEach(job => {
-            console.log(`  - ${job.title} (Recruiter: ${job.recruiter.name}, External: ${job.isExternal})`);
+            const isOwn = job.recruiterId === user.id;
+            console.log(`  - ${job.title} (Recruiter: ${job.recruiter.name}, RecruiterId: ${job.recruiterId}, UserId: ${user.id}, Own: ${isOwn}, External: ${job.isExternal})`);
         });
 
         return NextResponse.json(jobs);

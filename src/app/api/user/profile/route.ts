@@ -12,11 +12,14 @@ export async function GET() {
         const user = await prisma.user.findUnique({
             where: { clerkId: userId },
             select: {
+                id: true,
                 name: true,
                 email: true,
                 country: true,
                 photoUrl: true,
                 role: true,
+                recruiterStatus: true,
+                companyInfo: true,
                 autoApply: true,
                 matchThreshold: true,
                 autoApplyCountry: true,

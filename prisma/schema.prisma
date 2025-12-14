@@ -13,6 +13,13 @@ enum Role {
   ADMIN
 }
 
+enum RecruiterStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id                String   @id @default(auto()) @map("_id") @db.ObjectId
   clerkId           String   @unique
@@ -24,6 +31,11 @@ model User {
   matchThreshold    Int      @default(95) // Minimum match percentage for job matching (0-100)
   autoApplyCountry  String?  // Country filter for auto-apply feature
   role              Role     @default(JOB_SEEKER)
+  
+  // Recruiter Verification
+  recruiterStatus   RecruiterStatus @default(NONE)
+  companyInfo       Json?           // Stores { companyName, website, size, description, etc. }
+  
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -283,4 +295,14 @@ model Payment {
   updatedAt         DateTime @updatedAt
   
   @@index([userId])
+}
+
+model VerificationToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String   // Email or Phone
+  token      String
+  expires    DateTime
+  createdAt  DateTime @default(now())
+  
+  @@unique([identifier, token])
 }

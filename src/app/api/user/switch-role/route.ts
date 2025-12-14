@@ -35,6 +35,15 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "You are already on this role" }, { status: 400 });
         }
 
+        // If switching to RECRUITER, check if approved
+        if (newRole === "RECRUITER") {
+            if (user.recruiterStatus !== "APPROVED") {
+                return NextResponse.json({
+                    error: "Your recruiter application must be approved first"
+                }, { status: 403 });
+            }
+        }
+
         // Update role
         const updatedUser = await prisma.user.update({
             where: { clerkId: userId },

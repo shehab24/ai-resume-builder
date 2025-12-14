@@ -114,7 +114,6 @@ export default function MyApplicationsPage() {
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
 
     const shortlistedApps = applications.filter(app => ["SHORTLISTED", "INTERVIEW", "HIRED"].includes(app.status));
-    const regularApps = applications.filter(app => !["SHORTLISTED", "INTERVIEW", "HIRED"].includes(app.status));
 
     const ApplicationList = ({ apps, showTaskButton }: { apps: Application[], showTaskButton: boolean }) => (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -203,7 +202,7 @@ export default function MyApplicationsPage() {
                 <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
                     <TabsTrigger value="all" className="flex items-center gap-2">
                         <Briefcase className="h-4 w-4" />
-                        All Applications ({regularApps.length})
+                        All Applications ({applications.length})
                     </TabsTrigger>
                     <TabsTrigger value="shortlisted" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
@@ -212,7 +211,7 @@ export default function MyApplicationsPage() {
                 </TabsList>
 
                 <TabsContent value="all">
-                    <ApplicationList apps={regularApps} showTaskButton={false} />
+                    <ApplicationList apps={applications} showTaskButton={false} />
                 </TabsContent>
 
                 <TabsContent value="shortlisted">

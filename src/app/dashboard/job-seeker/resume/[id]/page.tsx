@@ -312,31 +312,27 @@ function calculateResumeScore(resume: ResumeData): number {
 
 const PersonalInfoSection = ({ displayResume, editedResume, isEditing, themeColor, layout, onUpdate, titleSizeClass }: { displayResume: ResumeData, editedResume: ResumeData | null, isEditing: boolean, themeColor: string, layout: string, onUpdate: (data: ResumeData) => void, titleSizeClass?: string }) => (
     <div className={cn("text-center", layout === 'modern' ? "text-left" : "")}>
-        {(isEditing || displayResume.personalInfo.profileImage) && (
-            <div className={cn("mb-4 flex flex-col gap-2", layout === 'modern' ? "items-start" : "items-center")}>
-                {displayResume.personalInfo.profileImage && (
-                    <img
-                        src={displayResume.personalInfo.profileImage}
-                        alt="Profile"
-                        className="w-24 h-24 rounded-full object-cover border-4 border-gray-200 print:border-gray-400"
-                        style={{ borderColor: layout === 'professional' ? themeColor : undefined }}
+        <div className={cn("mb-4 flex flex-col gap-2", layout === 'modern' ? "items-start" : "items-center")}>
+            <img
+                src={displayResume.personalInfo.profileImage || "https://github.com/shadcn.png"}
+                alt="Profile"
+                className="w-24 h-24 rounded-full object-cover border-4 border-gray-200 print:border-gray-400"
+                style={{ borderColor: layout === 'professional' ? themeColor : undefined }}
+            />
+            {isEditing && editedResume && (
+                <div className="w-full max-w-md">
+                    <Input
+                        value={editedResume.personalInfo.profileImage || ""}
+                        onChange={(e) => onUpdate({
+                            ...editedResume,
+                            personalInfo: { ...editedResume.personalInfo, profileImage: e.target.value }
+                        })}
+                        placeholder="Image URL"
+                        className="text-sm"
                     />
-                )}
-                {isEditing && editedResume && (
-                    <div className="w-full max-w-md">
-                        <Input
-                            value={editedResume.personalInfo.profileImage || ""}
-                            onChange={(e) => onUpdate({
-                                ...editedResume,
-                                personalInfo: { ...editedResume.personalInfo, profileImage: e.target.value }
-                            })}
-                            placeholder="Image URL"
-                            className="text-sm"
-                        />
-                    </div>
-                )}
-            </div>
-        )}
+                </div>
+            )}
+        </div>
 
         {isEditing && editedResume ? (
             <Input
@@ -721,7 +717,14 @@ export default function ResumeViewPage() {
     }
 
     const displayResume = isEditing ? editedResume : resume;
-    const { layout, themeColor, fontSize, fontColor, titleSize, sectionTitleSize } = displayResume.settings || { layout: 'classic', themeColor: '#000000', fontSize: 'medium', fontColor: '#000000', titleSize: 'medium', sectionTitleSize: 'medium' };
+    const {
+        layout = 'classic',
+        themeColor = '#000000',
+        fontSize = 'medium',
+        fontColor = '#000000',
+        titleSize = 'medium',
+        sectionTitleSize = 'medium'
+    } = displayResume.settings || {};
 
     const titleSizeClass = layout === 'modern'
         ? (titleSize === 'small' ? 'text-lg' : titleSize === 'large' ? 'text-2xl' : 'text-xl')
@@ -927,13 +930,11 @@ export default function ResumeViewPage() {
                             {/* Sidebar */}
                             <div className="w-1/3 p-6 text-white space-y-4 print:min-h-screen" style={{ backgroundColor: themeColor }}>
                                 <div className="text-center">
-                                    {displayResume.personalInfo.profileImage && (
-                                        <img
-                                            src={displayResume.personalInfo.profileImage}
-                                            alt="Profile"
-                                            className="w-32 h-32 rounded-full object-cover border-4 border-white mx-auto mb-4"
-                                        />
-                                    )}
+                                    <img
+                                        src={displayResume.personalInfo.profileImage || "https://github.com/shadcn.png"}
+                                        alt="Profile"
+                                        className="w-32 h-32 rounded-full object-cover border-4 border-white mx-auto mb-4"
+                                    />
                                     <h1 className={cn(titleSizeClass || "text-2xl", "font-bold uppercase leading-tight")}>{displayResume.personalInfo.fullName}</h1>
                                     <div className="text-sm mt-2 opacity-90 space-y-1">
                                         <div className="block">{displayResume.personalInfo.email}</div>
@@ -979,13 +980,11 @@ export default function ResumeViewPage() {
                                         <h1 className={cn(titleSizeClass || "text-4xl", "font-bold uppercase tracking-wider mb-2 leading-tight")}>{displayResume.personalInfo.fullName}</h1>
                                         <p className="text-lg opacity-90">Professional</p>
                                     </div>
-                                    {displayResume.personalInfo.profileImage && (
-                                        <img
-                                            src={displayResume.personalInfo.profileImage}
-                                            alt="Profile"
-                                            className="w-24 h-24 rounded-full object-cover border-4 border-white"
-                                        />
-                                    )}
+                                    <img
+                                        src={displayResume.personalInfo.profileImage || "https://github.com/shadcn.png"}
+                                        alt="Profile"
+                                        className="w-24 h-24 rounded-full object-cover border-4 border-white"
+                                    />
                                 </div>
                                 <div className="flex gap-4 mt-4 text-sm opacity-90 flex-wrap">
                                     <span>{displayResume.personalInfo.email}</span>

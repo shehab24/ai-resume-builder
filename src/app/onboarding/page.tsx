@@ -54,6 +54,8 @@ export default function OnboardingPage() {
         setIsLoading(true);
 
         try {
+            // Always create user as JOB_SEEKER initially
+            // If they want to be a recruiter, they'll fill the onboarding form
             const response = await fetch("/api/user/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -61,14 +63,21 @@ export default function OnboardingPage() {
                     clerkId: user.id,
                     email: user.primaryEmailAddress?.emailAddress,
                     name: user.fullName,
-                    role,
+                    role: "JOB_SEEKER", // Always start as job seeker
                 }),
             });
 
             if (!response.ok) throw new Error("Failed to create user");
 
             toast.success("Profile created successfully!");
-            router.push(role === "JOB_SEEKER" ? "/dashboard/job-seeker" : "/dashboard/recruiter");
+
+            // If they chose recruiter, send them to recruiter onboarding
+            // Otherwise, send to job seeker dashboard
+            if (role === "RECRUITER") {
+                router.push("/recruiter-onboarding");
+            } else {
+                router.push("/dashboard/job-seeker");
+            }
         } catch (error) {
             console.error(error);
             toast.error("Something went wrong. Please try again.");

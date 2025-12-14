@@ -4,19 +4,23 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Plus, Star, CheckCircle } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 interface Resume {
     id: string;
     title: string;
     createdAt: string;
     updatedAt: string;
+    isDefault: boolean;
 }
 
 export default function MyResumesPage() {
     const [resumes, setResumes] = useState<Resume[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [settingDefault, setSettingDefault] = useState<string | null>(null);
 
     useEffect(() => {
         fetchResumes();
@@ -33,6 +37,30 @@ export default function MyResumesPage() {
             console.error("Error fetching resumes:", error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const setAsDefault = async (resumeId: string) => {
+        setSettingDefault(resumeId);
+        try {
+            const response = await fetch(`/api/resume/${resumeId}/set-default`, {
+                method: "POST",
+            });
+
+            if (!response.ok) throw new Error("Failed to set default resume");
+
+            // Update local state
+            setResumes(resumes.map(r => ({
+                ...r,
+                isDefault: r.id === resumeId
+            })));
+
+            toast.success("Default resume updated!");
+        } catch (error) {
+            console.error("Error setting default resume:", error);
+            toast.error("Failed to set default resume");
+        } finally {
+            setSettingDefault(null);
         }
     };
 
@@ -79,13 +107,21 @@ export default function MyResumesPage() {
             ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {resumes.map((resume) => (
-                        <Card key={resume.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+                        <Card key={resume.id} className="hover:shadow-lg transition-shadow relative">
                             <Link href={`/dashboard/job-seeker/resume/${resume.id}`}>
                                 <CardHeader>
                                     <div className="flex items-start gap-3">
                                         <FileText className="h-5 w-5 text-primary mt-1" />
                                         <div className="flex-1">
-                                            <CardTitle className="text-lg">{resume.title}</CardTitle>
+                                            <div className="flex items-center gap-2">
+                                                <CardTitle className="text-lg">{resume.title}</CardTitle>
+                                                {resume.isDefault && (
+                                                    <Badge className="bg-green-500 hover:bg-green-600 gap-1">
+                                                        <Star className="h-3 w-3 fill-current" />
+                                                        Default
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </CardHeader>
@@ -98,6 +134,31 @@ export default function MyResumesPage() {
                                     </p>
                                 </CardContent>
                             </Link>
+
+                            {!resume.isDefault && (
+                                <div className="absolute bottom-4 right-4">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setAsDefault(resume.id);
+                                        }}
+                                        disabled={settingDefault === resume.id}
+                                        className="gap-1.5"
+                                    >
+                                        {settingDefault === resume.id ? (
+                                            <>Setting...</>
+                                        ) : (
+                                            <>
+                                                <Star className="h-3.5 w-3.5" />
+                                                Set as Default
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            )}
                         </Card>
                     ))}
                 </div>

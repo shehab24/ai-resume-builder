@@ -5,8 +5,18 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, MapPin, DollarSign, CheckCircle, Briefcase, Clock, Building, Calendar, Zap, ExternalLink } from "lucide-react";
+import { Loader2, MapPin, DollarSign, CheckCircle, Briefcase, Clock, Building, Calendar, Zap, ExternalLink, FileText, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Job {
     id: string;
@@ -38,6 +48,8 @@ export default function JobDetailsPage() {
     const [applying, setApplying] = useState(false);
     const [hasApplied, setHasApplied] = useState(false);
     const [hasResume, setHasResume] = useState(false);
+    const [resumeCount, setResumeCount] = useState(0);
+    const [showResumeDialog, setShowResumeDialog] = useState(false);
 
     useEffect(() => {
         const fetchJob = async () => {
@@ -62,8 +74,11 @@ export default function JobDetailsPage() {
                 const res = await fetch("/api/resumes");
                 if (res.ok) {
                     const data = await res.json();
+                    setResumeCount(data.resumes?.length || 0);
                     if (data.resumes && data.resumes.length > 0) {
-                        setHasResume(true);
+                        // Check if there's a default resume
+                        const hasDefault = data.resumes.some((resume: any) => resume.isDefault);
+                        setHasResume(hasDefault);
                     }
                 }
             } catch (error) {
@@ -80,6 +95,12 @@ export default function JobDetailsPage() {
     const handleApply = async () => {
         if (!job) return;
 
+        // Check if user has a resume first (required for all applications)
+        if (!hasResume) {
+            setShowResumeDialog(true);
+            return;
+        }
+
         // Handle External Application
         if (job.isExternal) {
             if (job.applicationMethod === "EMAIL" && job.applicationEmail) {
@@ -95,12 +116,6 @@ export default function JobDetailsPage() {
         }
 
         // Handle Internal Quick Apply
-        if (!hasResume) {
-            toast.error("Please create a resume first to use Quick Apply");
-            router.push("/dashboard/job-seeker/resume/create");
-            return;
-        }
-
         setApplying(true);
         try {
             const response = await fetch("/api/applications/create", {
@@ -250,6 +265,55 @@ export default function JobDetailsPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Resume Required Dialog */}
+            <AlertDialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <AlertCircle className="h-5 w-5 text-amber-500" />
+                            {resumeCount === 0 ? "No Resume Found" : "No Default Resume Selected"}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-3 pt-2">
+                            {resumeCount === 0 ? (
+                                <>
+                                    <p className="text-base">
+                                        You don't have any resume to apply for this job.
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Please create a resume first, then set it as default to apply for jobs.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <p className="text-base">
+                                        You have {resumeCount} resume{resumeCount > 1 ? 's' : ''}, but none is selected as default.
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Please select one resume as your default to apply for jobs. Your default resume will be sent to recruiters.
+                                    </p>
+                                </>
+                            )}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (resumeCount === 0) {
+                                    router.push("/dashboard/job-seeker/resume/create");
+                                } else {
+                                    router.push("/dashboard/job-seeker/resumes");
+                                }
+                            }}
+                            className="gap-2"
+                        >
+                            <FileText className="h-4 w-4" />
+                            {resumeCount === 0 ? "Create Resume" : "Select Default Resume"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

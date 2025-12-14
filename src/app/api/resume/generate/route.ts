@@ -141,8 +141,14 @@ export async function POST(req: Request) {
     if (templateId) {
       resumeData.settings = {
         ...(resumeData.settings || {}),
-        layout: templateId
+        layout: templateId,
+        themeColor: '#000000'
       };
+    }
+
+    // Ensure profile image exists
+    if (!resumeData.personalInfo.profileImage) {
+      resumeData.personalInfo.profileImage = dbUser.photoUrl || "https://github.com/shadcn.png";
     }
 
     // Save to database

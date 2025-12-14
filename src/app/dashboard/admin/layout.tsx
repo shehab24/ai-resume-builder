@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Briefcase, ChevronDown, ChevronRight, List, Globe, Plus } from "lucide-react";
+import { LayoutDashboard, Users, Briefcase, ChevronDown, ChevronRight, List, Globe, Plus, FileText } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 
 export default function AdminLayout({
@@ -13,6 +13,7 @@ export default function AdminLayout({
 }) {
     const pathname = usePathname();
     const [jobsMenuOpen, setJobsMenuOpen] = useState(true);
+    const [pendingCount, setPendingCount] = useState(0);
 
     useEffect(() => {
         const checkRole = async () => {
@@ -38,6 +39,27 @@ export default function AdminLayout({
         checkRole();
     }, []);
 
+    // Fetch pending applications count
+    useEffect(() => {
+        const fetchPendingCount = async () => {
+            try {
+                const res = await fetch("/api/admin/recruiter-applications");
+                if (res.ok) {
+                    const data = await res.json();
+                    const pending = data.applications.filter((app: any) => app.recruiterStatus === "PENDING");
+                    setPendingCount(pending.length);
+                }
+            } catch (error) {
+                console.error("Failed to fetch pending count:", error);
+            }
+        };
+        fetchPendingCount();
+
+        // Refresh count every 30 seconds
+        const interval = setInterval(fetchPendingCount, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
     // Auto-expand jobs menu if on a jobs-related page
     useEffect(() => {
         if (pathname.startsWith('/dashboard/admin/jobs') || pathname.startsWith('/dashboard/admin/job-sources') || pathname.startsWith('/dashboard/admin/import-job')) {
@@ -48,6 +70,7 @@ export default function AdminLayout({
     const navigation = [
         { name: "Overview", href: "/dashboard/admin", icon: LayoutDashboard },
         { name: "User Management", href: "/dashboard/admin/users", icon: Users },
+        { name: "Recruiter Applications", href: "/dashboard/admin/recruiter-applications", icon: FileText },
     ];
 
     const jobsSubMenu = [
@@ -71,22 +94,31 @@ export default function AdminLayout({
                 <nav className="flex-1 space-y-2 px-3 py-6 overflow-y-auto max-h-[calc(100vh-8rem)]">
                     {navigation.map((item) => {
                         const isActive = pathname === item.href;
+                        const showBadge = item.name === "Recruiter Applications" && pendingCount > 0;
+
                         return (
                             <Link
                                 key={item.name}
                                 href={item.href}
-                                className={`group flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${isActive
-                                        ? "bg-gradient-to-r from-red-50 to-orange-50 text-red-600 dark:from-red-900/20 dark:to-orange-900/20 dark:text-red-400 shadow-sm"
-                                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:shadow-sm"
+                                className={`group flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${isActive
+                                    ? "bg-gradient-to-r from-red-50 to-orange-50 text-red-600 dark:from-red-900/20 dark:to-orange-900/20 dark:text-red-400 shadow-sm"
+                                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 hover:shadow-sm"
                                     }`}
                             >
-                                <item.icon
-                                    className={`mr-3 h-5 w-5 flex-shrink-0 transition-colors ${isActive
+                                <div className="flex items-center">
+                                    <item.icon
+                                        className={`mr-3 h-5 w-5 flex-shrink-0 transition-colors ${isActive
                                             ? "text-red-600 dark:text-red-400"
                                             : "text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"
-                                        }`}
-                                />
-                                {item.name}
+                                            }`}
+                                    />
+                                    {item.name}
+                                </div>
+                                {showBadge && (
+                                    <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                                        {pendingCount}
+                                    </span>
+                                )}
                             </Link>
                         );
                     })}
@@ -121,14 +153,14 @@ export default function AdminLayout({
                                             key={item.name}
                                             href={item.href}
                                             className={`group flex items-center px-3 py-2.5 text-sm rounded-lg transition-all duration-200 ${isActive
-                                                    ? "bg-gradient-to-r from-red-50 to-orange-50 text-red-600 dark:from-red-900/20 dark:to-orange-900/20 dark:text-red-400 font-medium shadow-sm"
-                                                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200"
+                                                ? "bg-gradient-to-r from-red-50 to-orange-50 text-red-600 dark:from-red-900/20 dark:to-orange-900/20 dark:text-red-400 font-medium shadow-sm"
+                                                : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200"
                                                 }`}
                                         >
                                             <item.icon
                                                 className={`mr-2.5 h-4 w-4 flex-shrink-0 transition-colors ${isActive
-                                                        ? "text-red-600 dark:text-red-400"
-                                                        : "text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"
+                                                    ? "text-red-600 dark:text-red-400"
+                                                    : "text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300"
                                                     }`}
                                             />
                                             {item.name}

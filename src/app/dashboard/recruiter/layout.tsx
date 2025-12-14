@@ -3,12 +3,13 @@
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Users, PlusCircle, User, Video } from "lucide-react";
+import { Briefcase, Users, PlusCircle, User, Video, Search } from "lucide-react";
 import { useEffect } from "react";
 import { Notifications } from "@/components/Notifications";
 import { RoleSwitcher } from "@/components/RoleSwitcher";
 import { useSubscription } from "@/hooks/use-subscription-status";
 import { Badge } from "@/components/ui/badge";
+import { usePathname } from "next/navigation";
 
 export default function RecruiterLayout({
     children,
@@ -16,6 +17,7 @@ export default function RecruiterLayout({
     children: React.ReactNode;
 }) {
     const { isPro } = useSubscription();
+    const pathname = usePathname();
 
     useEffect(() => {
         const checkProfile = async () => {
@@ -35,6 +37,12 @@ export default function RecruiterLayout({
                         return;
                     }
 
+                    // Only check recruiter status if role is RECRUITER
+                    if (data.role === "RECRUITER" && data.recruiterStatus !== "APPROVED") {
+                        window.location.href = "/recruiter-onboarding";
+                        return;
+                    }
+
                     if (data.isBlocked) {
                         if (data.blockedUntil && new Date(data.blockedUntil) < new Date()) {
                             // Expired
@@ -48,7 +56,7 @@ export default function RecruiterLayout({
             }
         };
         checkProfile();
-    }, []);
+    }, [pathname]);
 
     return (
         <div className="flex min-h-screen bg-gray-100">
