@@ -161,6 +161,11 @@ export async function GET(req: Request) {
                             user: true,
                             job: true
                         }
+                    },
+                    participants: {
+                        include: {
+                            user: true
+                        }
                     }
                 },
                 orderBy: { scheduledAt: "asc" }

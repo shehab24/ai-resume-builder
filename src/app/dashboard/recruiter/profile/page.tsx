@@ -6,19 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CountrySelect } from "@/components/CountrySelect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Loader2, Save, User as UserIcon, Camera, Briefcase, Users } from "lucide-react";
 import { toast } from "sonner";
-
-const COUNTRIES = [
-    "United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "India",
-    "China", "Japan", "Brazil", "Mexico", "Spain", "Italy", "Netherlands", "Sweden",
-    "Switzerland", "Singapore", "South Korea", "Russia", "Poland", "Turkey", "Indonesia",
-    "Thailand", "Malaysia", "Philippines", "Vietnam", "Bangladesh", "Pakistan", "Egypt",
-    "South Africa", "Nigeria", "Kenya", "Argentina", "Chile", "Colombia", "Peru",
-    "New Zealand", "Ireland", "Denmark", "Norway", "Finland", "Belgium", "Austria",
-    "Portugal", "Greece", "Czech Republic", "Romania", "Hungary", "Ukraine", "Other"
-];
 
 interface UserProfile {
     name: string;
@@ -253,18 +244,11 @@ export default function RecruiterProfilePage() {
                             <Label htmlFor="country">
                                 Country <span className="text-red-500">*</span>
                             </Label>
-                            <Select value={profile.country} onValueChange={(value) => setProfile({ ...profile, country: value })}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select your country" />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-60">
-                                    {COUNTRIES.map((country) => (
-                                        <SelectItem key={country} value={country}>
-                                            {country}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <CountrySelect
+                                value={profile.country}
+                                onValueChange={(value) => setProfile({ ...profile, country: value })}
+                                placeholder="Select your country"
+                            />
                             {!profile.country && (
                                 <p className="text-xs text-red-500">Country is required to complete your profile</p>
                             )}

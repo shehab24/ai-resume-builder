@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CountrySelect } from "@/components/CountrySelect";
+import { CURRENCIES } from "@/lib/currencies";
 import { toast } from "sonner";
 import { Loader2, Plus, X, Briefcase } from "lucide-react";
 
@@ -25,6 +27,7 @@ export default function CreateJobPage() {
         experienceLevel: "Mid", // Default
         salaryMin: "",
         salaryMax: "",
+        salaryCurrency: "BDT", // Default to BDT
         requirements: "",
         benefits: "",
         applicationDeadline: "",
@@ -67,6 +70,7 @@ export default function CreateJobPage() {
                     experienceLevel: formData.experienceLevel,
                     salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : null,
                     salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : null,
+                    salaryCurrency: formData.salaryCurrency,
                     requirements: formData.requirements.split(",").map((r) => r.trim()).filter(r => r),
                     benefits: formData.benefits.split(",").map((b) => b.trim()).filter(b => b),
                     applicationDeadline: formData.applicationDeadline || null,
@@ -208,22 +212,11 @@ export default function CreateJobPage() {
 
                             <div className="space-y-2">
                                 <Label htmlFor="country">Country</Label>
-                                <Select value={formData.country} onValueChange={(value) => setFormData({ ...formData, country: value })}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select country" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Worldwide">Worldwide / Remote</SelectItem>
-                                        <SelectItem value="United States">United States</SelectItem>
-                                        <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                                        <SelectItem value="Canada">Canada</SelectItem>
-                                        <SelectItem value="Germany">Germany</SelectItem>
-                                        <SelectItem value="France">France</SelectItem>
-                                        <SelectItem value="India">India</SelectItem>
-                                        <SelectItem value="Australia">Australia</SelectItem>
-                                        {/* Add more countries as needed */}
-                                    </SelectContent>
-                                </Select>
+                                <CountrySelect
+                                    value={formData.country}
+                                    onValueChange={(value) => setFormData({ ...formData, country: value })}
+                                    placeholder="Select country..."
+                                />
                             </div>
 
                             <div className="space-y-2">
@@ -246,26 +239,44 @@ export default function CreateJobPage() {
                         <CardDescription>Salary range and additional perks</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="salaryMin">Minimum Salary (USD)</Label>
-                                <Input
-                                    id="salaryMin"
-                                    type="number"
-                                    placeholder="e.g., 100000"
-                                    value={formData.salaryMin}
-                                    onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
-                                />
+                                <Label htmlFor="salaryCurrency">Salary Currency</Label>
+                                <Select value={formData.salaryCurrency} onValueChange={(value) => setFormData({ ...formData, salaryCurrency: value })}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select currency" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {CURRENCIES.map((currency) => (
+                                            <SelectItem key={currency.code} value={currency.code}>
+                                                {currency.symbol} {currency.code} - {currency.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="salaryMax">Maximum Salary (USD)</Label>
-                                <Input
-                                    id="salaryMax"
-                                    type="number"
-                                    placeholder="e.g., 150000"
-                                    value={formData.salaryMax}
-                                    onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
-                                />
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="salaryMin">Minimum Salary ({formData.salaryCurrency})</Label>
+                                    <Input
+                                        id="salaryMin"
+                                        type="number"
+                                        placeholder="e.g., 50000"
+                                        value={formData.salaryMin}
+                                        onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="salaryMax">Maximum Salary ({formData.salaryCurrency})</Label>
+                                    <Input
+                                        id="salaryMax"
+                                        type="number"
+                                        placeholder="e.g., 100000"
+                                        value={formData.salaryMax}
+                                        onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
+                                    />
+                                </div>
                             </div>
                         </div>
 

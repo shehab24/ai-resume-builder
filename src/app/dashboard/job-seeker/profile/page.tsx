@@ -7,22 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CountrySelect } from "@/components/CountrySelect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, Save, User as UserIcon, Camera, Award, FileText, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { useSubscription } from "@/hooks/use-subscription";
 import { Badge } from "@/components/ui/badge";
-
-const COUNTRIES = [
-    "United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "India",
-    "China", "Japan", "Brazil", "Mexico", "Spain", "Italy", "Netherlands", "Sweden",
-    "Switzerland", "Singapore", "South Korea", "Russia", "Poland", "Turkey", "Indonesia",
-    "Thailand", "Malaysia", "Philippines", "Vietnam", "Bangladesh", "Pakistan", "Egypt",
-    "South Africa", "Nigeria", "Kenya", "Argentina", "Chile", "Colombia", "Peru",
-    "New Zealand", "Ireland", "Denmark", "Norway", "Finland", "Belgium", "Austria",
-    "Portugal", "Greece", "Czech Republic", "Romania", "Hungary", "Ukraine", "Other"
-];
 
 interface UserProfile {
     name: string;
@@ -330,18 +321,11 @@ export default function ProfilePage() {
                             <Label htmlFor="country">
                                 Country <span className="text-red-500">*</span>
                             </Label>
-                            <Select value={profile.country} onValueChange={(value) => setProfile({ ...profile, country: value })}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select your country" />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-60">
-                                    {COUNTRIES.map((country) => (
-                                        <SelectItem key={country} value={country}>
-                                            {country}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <CountrySelect
+                                value={profile.country}
+                                onValueChange={(value) => setProfile({ ...profile, country: value })}
+                                placeholder="Select your country"
+                            />
                             {!profile.country && (
                                 <p className="text-xs text-red-500">Country is required to complete your profile</p>
                             )}
@@ -423,21 +407,12 @@ export default function ProfilePage() {
                                     {/* Auto-Apply Country Select (shown when auto-apply is enabled) */}
                                     <div className="mt-4">
                                         <Label htmlFor="autoApplyCountry" className="block text-sm font-medium text-gray-700 dark:text-gray-200">Apply To Country</Label>
-                                        <Select
+                                        <CountrySelect
                                             value={profile.autoApplyCountry}
                                             onValueChange={(value) => setProfile({ ...profile, autoApplyCountry: value })}
-                                        >
-                                            <SelectTrigger id="autoApplyCountry" className="w-full mt-1">
-                                                <SelectValue placeholder="Select country" />
-                                            </SelectTrigger>
-                                            <SelectContent className="max-h-60">
-                                                {COUNTRIES.map((c) => (
-                                                    <SelectItem key={c} value={c}>
-                                                        {c}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                            placeholder="Select country"
+                                            className="mt-1"
+                                        />
                                     </div>
                                 </>
                             )}
