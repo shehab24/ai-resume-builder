@@ -32,7 +32,7 @@ export default async function Home() {
               <Link href="/sign-in">Log In</Link>
             </Button>
             <Button asChild>
-              <Link href="/sign-up">Get Started</Link>
+              <Link href="/create-resume">Get Started</Link>
             </Button>
           </SignedOut>
           <SignedIn>
@@ -56,7 +56,7 @@ export default async function Home() {
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <SignedOut>
               <Button size="lg" className="text-lg px-8 h-12" asChild>
-                <Link href="/sign-up">
+                <Link href="/create-resume">
                   Create My Resume <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
