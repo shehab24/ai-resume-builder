@@ -20,13 +20,15 @@ interface ResumeTemplateProps {
         education?: Array<{
             degree: string;
             school: string;
-            year: string;
+            startDate: string;
+            endDate: string;
         }>;
     };
     template: 'professional' | 'modern' | 'classic';
 }
 
 export function ResumeTemplate({ data, template }: ResumeTemplateProps) {
+    console.log(data);
     if (template === 'professional') {
         return <ProfessionalTemplate data={data} />;
     } else if (template === 'modern') {
@@ -96,13 +98,26 @@ function ProfessionalTemplate({ data }: { data: ResumeTemplateProps['data'] }) {
                 <div className="mb-6">
                     <h2 className="text-xl font-bold text-black mb-3 uppercase">Education</h2>
                     <div className="space-y-3">
-                        {data.education.map((edu, i) => (
-                            <div key={i}>
-                                <h3 className="text-lg font-semibold text-black">{edu.degree}</h3>
-                                <p className="text-sm text-gray-700">{edu.school}</p>
-                                <p className="text-xs text-gray-600">{edu.year}</p>
-                            </div>
-                        ))}
+                        {data.education.map((edu, i) => {
+                            let dateRange = '';
+                            if (edu.startDate && edu.endDate) {
+                                const endDateStr = edu.endDate.toLowerCase() === 'present'
+                                    ? 'Present'
+                                    : new Date(edu.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                                dateRange = `${new Date(edu.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - ${endDateStr}`;
+                            } else if (edu.startDate) {
+                                dateRange = `${new Date(edu.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - Present`;
+                            } else {
+                                dateRange = edu.endDate || '';
+                            }
+                            return (
+                                <div key={i}>
+                                    <h3 className="text-lg font-semibold text-black">{edu.degree}</h3>
+                                    <p className="text-sm text-gray-700">{edu.school}</p>
+                                    <p className="text-xs text-gray-600">{dateRange}</p>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -182,13 +197,26 @@ function ModernTemplate({ data }: { data: ResumeTemplateProps['data'] }) {
                         Education
                     </h2>
                     <div className="space-y-3">
-                        {data.education.map((edu, i) => (
-                            <div key={i} className="bg-white p-4 rounded-lg shadow-sm">
-                                <h3 className="text-lg font-bold text-gray-800">{edu.degree}</h3>
-                                <p className="text-sm text-purple-600 font-semibold">{edu.school}</p>
-                                <p className="text-xs text-gray-500">{edu.year}</p>
-                            </div>
-                        ))}
+                        {data.education.map((edu, i) => {
+                            let dateRange = '';
+                            if (edu.startDate && edu.endDate) {
+                                const endDateStr = edu.endDate.toLowerCase() === 'present'
+                                    ? 'Present'
+                                    : new Date(edu.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                                dateRange = `${new Date(edu.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - ${endDateStr}`;
+                            } else if (edu.startDate) {
+                                dateRange = `${new Date(edu.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - Present`;
+                            } else {
+                                dateRange = edu.endDate || '';
+                            }
+                            return (
+                                <div key={i} className="bg-white p-4 rounded-lg shadow-sm">
+                                    <h3 className="text-lg font-bold text-gray-800">{edu.degree}</h3>
+                                    <p className="text-sm text-purple-600 font-semibold">{edu.school}</p>
+                                    <p className="text-xs text-gray-500">{dateRange}</p>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -262,15 +290,28 @@ function ClassicTemplate({ data }: { data: ResumeTemplateProps['data'] }) {
                         EDUCATION
                     </h2>
                     <div className="space-y-3">
-                        {data.education.map((edu, i) => (
-                            <div key={i}>
-                                <div className="flex justify-between items-baseline">
-                                    <h3 className="text-base font-semibold text-gray-900">{edu.degree}</h3>
-                                    <span className="text-xs text-gray-600">{edu.year}</span>
+                        {data.education.map((edu, i) => {
+                            let dateRange = '';
+                            if (edu.startDate && edu.endDate) {
+                                const endDateStr = edu.endDate.toLowerCase() === 'present'
+                                    ? 'Present'
+                                    : new Date(edu.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                                dateRange = `${new Date(edu.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - ${endDateStr}`;
+                            } else if (edu.startDate) {
+                                dateRange = `${new Date(edu.startDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - Present`;
+                            } else {
+                                dateRange = edu.endDate || '';
+                            }
+                            return (
+                                <div key={i}>
+                                    <div className="flex justify-between items-baseline">
+                                        <h3 className="text-base font-semibold text-gray-900">{edu.degree}</h3>
+                                        <span className="text-xs text-gray-600">{dateRange}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-700 italic">{edu.school}</p>
                                 </div>
-                                <p className="text-sm text-gray-700 italic">{edu.school}</p>
-                            </div>
-                        ))}
+                            );
+                        })})
                     </div>
                 </div>
             )}

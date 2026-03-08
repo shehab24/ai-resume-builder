@@ -11,35 +11,48 @@ export async function POST(req: Request) {
         // Build the prompt for AI
         const hasPersonalInfo = personalInfo.fullName || personalInfo.email;
         
-        const prompt = hasPersonalInfo ? 
-        `You are a professional resume writer. Enhance the following resume content to make it more professional and impactful. Return ONLY a JSON object with the enhanced content.
+        const prompt = hasPersonalInfo
+          ? `You are a professional resume writer. Enhance the following resume content to make it more professional and impactful. Return ONLY a JSON object with the enhanced content.
 
 Personal Info:
 - Name: ${personalInfo.fullName}
 - Email: ${personalInfo.email}
-${personalInfo.phone ? `- Phone: ${personalInfo.phone}` : ''}
-${personalInfo.location ? `- Location: ${personalInfo.location}` : ''}
+${personalInfo.phone ? `- Phone: ${personalInfo.phone}` : ""}
+${personalInfo.location ? `- Location: ${personalInfo.location}` : ""}
 
 Professional Summary:
-${professionalSummary || 'Not provided'}
+${professionalSummary || "Not provided"}
 
 Skills:
-${skills.join(', ') || 'Not provided'}
+${skills.join(", ") || "Not provided"}
 
 Experience:
-${experience.map((exp: any) => `
+${
+  experience
+    .map(
+      (exp: any) => `
 Position: ${exp.position}
 Company: ${exp.company}
 Duration: ${exp.startDate} - ${exp.endDate}
 Description: ${exp.description}
-`).join('\n') || 'Not provided'}
+`,
+    )
+    .join("\n") || "Not provided"
+}
 
 Education:
-${education.map((edu: any) => `
+${
+  education
+    .map(
+      (edu: any) => `
 Degree: ${edu.degree}
 School: ${edu.school}
-Year: ${edu.year}
-`).join('\n') || 'Not provided'}
+Start Date: ${edu.startDate}
+End Date: ${edu.endDate === "present" ? "Currently Studying" : edu.endDate || "Currently Studying"}
+`,
+    )
+    .join("\n") || "Not provided"
+}
 
 Please enhance this resume content and return it in the following JSON format:
 {
@@ -58,14 +71,14 @@ Please enhance this resume content and return it in the following JSON format:
     {
       "degree": "Degree Name",
       "school": "School Name",
-      "year": "Year"
+      "startDate": "Start Date (format: YYYY-MM-DD)",
+      "endDate": "End Date (format: YYYY-MM-DD or 'present' if currently studying)"
     }
   ]
 }
 
 IMPORTANT: Return ONLY the JSON object, no additional text or markdown formatting.`
-        :
-        `You are a professional resume writer. Based on the following text, extract and enhance resume information. Return ONLY a JSON object.
+          : `You are a professional resume writer. Based on the following text, extract and enhance resume information. Return ONLY a JSON object.
 
 User's Information:
 ${professionalSummary}
@@ -93,7 +106,8 @@ Please analyze this text and create a professional resume with the following JSO
     {
       "degree": "Extract degree/qualification",
       "school": "Extract school/university name",
-      "year": "Extract graduation year or period"
+      "startDate": "Extract start date (format: YYYY-MM-DD)",
+      "endDate": "Extract end date (format: YYYY-MM-DD or 'present' if currently studying)"
     }
   ]
 }
