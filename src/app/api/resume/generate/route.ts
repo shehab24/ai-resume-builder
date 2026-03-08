@@ -71,7 +71,9 @@ export async function POST(req: Request) {
             {
               "degree": "string (e.g., Bachelor of Science in Computer Science)",
               "school": "string (institution name)",
-              "graduationDate": "string (YYYY format)"
+              "fieldOfStudy": "string (field of study)",
+              "startDate": "string (YYYY-MM-DD format)",
+              "endDate": "string (YYYY-MM-DD format, or 'present' if currently studying)"
             }
           ],
           "skills": ["string (categorized: technical skills, soft skills, tools, languages)"],

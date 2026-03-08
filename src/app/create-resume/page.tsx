@@ -85,7 +85,7 @@ export default function CreateResumePage() {
         }
     };
 
-    const handleGenerate = async (finalPrompt: string) => {
+    const handleGenerate = async (finalPrompt: string, resumeData?: any) => {
         if (!finalPrompt.trim()) {
             toast.error("Resume data is missing. Please fill the form.");
             return;
@@ -100,11 +100,12 @@ export default function CreateResumePage() {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        personalInfo: {},
+                        personalInfo: resumeData?.basicInfo || {},
                         professionalSummary: finalPrompt,
-                        skills: [],
-                        experience: [],
-                        education: []
+                        skills: resumeData?.skills || [],
+                        experience: resumeData?.experience || [],
+                        education: resumeData?.education || [],
+                        preferences: resumeData?.preferences || {}
                     }),
                 });
 
@@ -152,7 +153,15 @@ export default function CreateResumePage() {
             const response = await fetch("/api/resume/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt: finalPrompt, templateId: selectedTemplate }),
+                body: JSON.stringify({
+                    prompt: finalPrompt,
+                    personalInfo: resumeData?.basicInfo || {},
+                    skills: resumeData?.skills || [],
+                    experience: resumeData?.experience || [],
+                    education: resumeData?.education || [],
+                    preferences: resumeData?.preferences || {},
+                    templateId: selectedTemplate
+                }),
             });
 
             const data = await response.json();
@@ -298,7 +307,7 @@ export default function CreateResumePage() {
         <div className="max-w-6xl mx-auto space-y-8">
             {/* Header */}
             <div className="text-center space-y-2">
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+                <h1 className="text-4xl font-bold bg-linear-to-r from-primary to-purple-600 bg-clip-text text-transparent">
                     Create Your Perfect Resume
                 </h1>
                 <p className="text-muted-foreground text-lg">
@@ -312,7 +321,7 @@ export default function CreateResumePage() {
             </div>
 
             {/* Info banner for unauthenticated users */}
-            {!isSignedIn && <UnauthenticatedBanner />}
+            {/* {!isSignedIn && <UnauthenticatedBanner />} */}
 
             {/* Show upgrade prompt if limit reached */}
             {resumeLimit && !resumeLimit.canCreate ? (

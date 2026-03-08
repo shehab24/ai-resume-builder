@@ -53,6 +53,7 @@ export function PreferencesStep({ onBack, onGenerate, isGenerating }: Preference
           <Select
             value={selectedLanguage}
             onValueChange={(val) => setValue("language", val, { shouldValidate: true })}
+
           >
             <SelectTrigger>
               <SelectValue placeholder="Select Language" />

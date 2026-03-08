@@ -13,7 +13,7 @@ import { buildAIPrompt } from "@/lib/utils/resume";
 import { Sparkles } from "lucide-react";
 
 interface MultiStepFormProps {
-  handleGenerate: (prompt: string) => void;
+  handleGenerate: (prompt: string, resumeData?: any) => void;
   isGenerating: boolean;
 }
 
@@ -34,7 +34,7 @@ export function MultiStepForm({ handleGenerate, isGenerating }: MultiStepFormPro
 
   const onGenerateTrigger = () => {
     const prompt = buildAIPrompt(resumeState);
-    handleGenerate(prompt);
+    handleGenerate(prompt, resumeState);
   };
 
   const progress = (step / 5) * 100;

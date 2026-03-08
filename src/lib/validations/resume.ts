@@ -22,7 +22,8 @@ export const educationSchema = z.object({
   degree: z.string().min(2, "Degree is required"),
   fieldOfStudy: z.string().min(2, "Field of study is required"),
   startDate: z.string().min(2, "Start date is required"),
-  endDate: z.string().min(2, "End date is required"),
+  endDate: z.string().optional(),
+  isCurrentlyStudying: z.boolean().optional(),
 });
 
 export const preferencesSchema = z.object({
