@@ -1,7 +1,6 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,54 +9,56 @@ import { Loader2 } from "lucide-react";
 
 export default function OnboardingPage() {
     const { user } = useUser();
-    const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [checkingRole, setCheckingRole] = useState(true);
 
-    // Check if user already has a role
+    // Check if user already has a role — retry up to 3 times to handle
+    // Clerk session not being immediately ready after the force redirect
     useEffect(() => {
-        const checkExistingRole = async () => {
+        if (!user) return;
+
+        let attempts = 0;
+        const MAX = 3;
+
+        const checkExistingRole = async (): Promise<void> => {
+            attempts++;
             try {
                 const res = await fetch("/api/user/check");
+
+                if (res.status === 401 && attempts < MAX) {
+                    // Clerk session not ready yet — wait and retry
+                    await new Promise(r => setTimeout(r, 800 * attempts));
+                    return checkExistingRole();
+                }
+
                 if (res.ok) {
                     const data = await res.json();
-
                     console.log("[Onboarding] User check response:", data);
 
-                    // If user exists and has a role, redirect to their dashboard
                     if (data.exists && data.role) {
-                        console.log("[Onboarding] User has role:", data.role);
-                        if (data.role === "ADMIN") {
-                            console.log("[Onboarding] Redirecting to admin dashboard");
-                            router.push("/dashboard/admin");
-                        } else if (data.role === "RECRUITER") {
-                            console.log("[Onboarding] Redirecting to recruiter dashboard");
-                            router.push("/dashboard/recruiter");
-                        } else {
-                            console.log("[Onboarding] Redirecting to job seeker dashboard");
-                            router.push("/dashboard/job-seeker");
-                        }
+                        // Hard navigation — breaks Clerk's force-redirect loop
+                        if (data.role === "ADMIN")          window.location.href = "/dashboard/admin";
+                        else if (data.role === "RECRUITER") window.location.href = "/dashboard/recruiter";
+                        else                                window.location.href = "/dashboard/job-seeker";
                         return;
-                    } else {
-                        console.log("[Onboarding] User does not exist or has no role");
                     }
-                } else {
-                    console.error("[Onboarding] API check failed:", res.status);
                 }
             } catch (error) {
-                console.error("Error checking role:", error);
-            } finally {
-                setCheckingRole(false);
+                console.error("[Onboarding] check error:", error);
+                if (attempts < MAX) {
+                    await new Promise(r => setTimeout(r, 800 * attempts));
+                    return checkExistingRole();
+                }
             }
+            // All retries exhausted or user genuinely doesn't exist — show role picker
+            setCheckingRole(false);
         };
 
-        if (user) {
-            console.log("[Onboarding] Clerk user loaded, checking role...");
-            checkExistingRole();
-        } else {
-            console.log("[Onboarding] No Clerk user yet");
-        }
-    }, [user, router]);
+        checkExistingRole();
+    }, [user]);
+
+
+
 
     const handleRoleSelection = async (role: "JOB_SEEKER" | "RECRUITER") => {
         if (!user) {
@@ -67,8 +68,6 @@ export default function OnboardingPage() {
         setIsLoading(true);
 
         try {
-            // Always create user as JOB_SEEKER initially
-            // If they want to be a recruiter, they'll fill the onboarding form
             const response = await fetch("/api/user/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -82,34 +81,42 @@ export default function OnboardingPage() {
 
             if (!response.ok) throw new Error("Failed to create user");
 
-            toast.success("Profile created successfully!");
+            toast.success("Profile created!");
 
-            // If they chose recruiter, send them to recruiter onboarding
-            // Otherwise, send to job seeker dashboard
+            // Use hard navigation so Clerk's force-redirect doesn't intercept
             if (role === "RECRUITER") {
-                router.push("/recruiter-onboarding");
+                window.location.href = "/recruiter-onboarding";
             } else {
-                router.push("/dashboard/job-seeker");
+                window.location.href = "/dashboard/job-seeker";
             }
         } catch (error) {
             console.error(error);
             toast.error("Something went wrong. Please try again.");
-        } finally {
             setIsLoading(false);
         }
+
     };
+
+
+    // Hard-timeout: if still loading after 10s, show role picker
+    useEffect(() => {
+        const t = setTimeout(() => setCheckingRole(false), 10_000);
+        return () => clearTimeout(t);
+    }, []);
 
     // Show loading while checking role
     if (checkingRole) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-50">
                 <div className="text-center">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-                    <p className="text-gray-600">Loading...</p>
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+                    <p className="text-gray-600">Setting up your account…</p>
+                    <p className="text-gray-400 text-sm mt-1">This only takes a moment</p>
                 </div>
             </div>
         );
     }
+
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-50">

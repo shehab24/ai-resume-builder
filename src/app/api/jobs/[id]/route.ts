@@ -46,21 +46,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         const response = {
             id: job.id,
             title: job.title,
-            company: job.company, // Added company field
+            company: job.company,
             description: job.description,
             location: job.location,
-            country: job.country, // Added
-            salary,
+            country: job.country,
+            salary: job.salary || salary, // Prefer string salary if available
             requirements: job.requirements,
             recruiter: job.recruiter,
+            recruiterId: job.recruiterId,
             jobType: job.jobType,
             workMode: job.workMode,
             experienceLevel: job.experienceLevel,
             benefits: job.benefits,
             applicationDeadline: job.applicationDeadline,
             tasks: job.tasks,
-            hasApplied: !!existingApplication, // Add this flag
-            isOwnJob: isOwnJob // Add this flag to indicate if user posted this job
+            hasApplied: !!existingApplication,
+            isOwnJob: isOwnJob,
+            isExternal: job.isExternal,
+            externalUrl: job.externalUrl,
+            applicationMethod: job.applicationMethod,
+            applicationEmail: job.applicationEmail
         };
 
         return NextResponse.json(response);

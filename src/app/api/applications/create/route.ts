@@ -10,7 +10,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { jobId } = body;
+        const { jobId, resumeId } = body;
 
         const user = await prisma.user.findUnique({
             where: { clerkId: userId },
@@ -50,13 +50,32 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "You have already applied to this job" }, { status: 400 });
         }
 
+        // Ensure a valid resume is provided
+        let resume = null;
+        if (resumeId) {
+            resume = await prisma.resume.findFirst({
+                where: { id: resumeId, userId: user.id }
+            });
+        }
+        if (!resume) {
+            // Fallback to default resume if no specific ID or invalid ID
+            resume = await prisma.resume.findFirst({
+                where: { userId: user.id, isDefault: true }
+            });
+        }
+        if (!resume) {
+            return NextResponse.json({ error: "No valid resume found. Please provide a resume to apply." }, { status: 400 });
+        }
+
         const application = await prisma.application.create({
             data: {
                 jobId,
                 userId: user.id,
                 status: "PENDING",
                 taskSubmissions: [], // Initialize empty
-            },
+                resumeId: resume.id,
+                resumeContent: resume.content ? JSON.parse(resume.content) : null, // Snapshot the content
+            } as any,
         });
 
         // Notify Recruiter

@@ -18,6 +18,7 @@ enum RecruiterStatus {
   PENDING
   APPROVED
   REJECTED
+  BLOCKED
 }
 
 model User {
@@ -38,6 +39,7 @@ model User {
   
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  lastSeenAt        DateTime? // Updated on every authenticated page visit
 
   // Moderation
   isBlocked         Boolean  @default(false)
@@ -82,6 +84,8 @@ model Resume {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  applications Application[]
 }
 
 model Job {
@@ -162,6 +166,8 @@ model Application {
   taskScore        Int?     // 0-100: AI evaluation of task submissions
   compositeScore   Int?     // 0-100: Weighted average (40% resume + 60% task)
   aiEvaluation     String?  // AI's detailed feedback on candidate
+  resumeId         String?  @db.ObjectId // Reference to the selected resume
+  resume           Resume?  @relation(fields: [resumeId], references: [id])
   resumeContent    Json?    // Snapshot of resume content at time of application
   isTopCandidate   Boolean  @default(false) // Auto-set for top 10 candidates
   
