@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Briefcase, MapPin, DollarSign, Trash2, Pencil, Users, Trophy, Calendar, Crown } from "lucide-react";
+import { Loader2, Briefcase, MapPin, DollarSign, Trash2, Pencil, Users, Trophy, Crown, Calendar, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useSubscription } from "@/hooks/use-subscription";
 import {
@@ -36,6 +33,87 @@ interface Job {
     applicantCount?: number;
     createdAt: string;
 }
+
+const css = `
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    .rj-wrap { font-family: 'Inter', sans-serif; max-width: 1200px; margin: 0 auto; padding-bottom: 80px; }
+
+    /* Page Header */
+    .rj-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; gap: 16px; flex-wrap: wrap; }
+    .rj-title { font-size: 32px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; margin: 0; }
+    .rj-subtitle { font-size: 15px; color: #64748b; margin-top: 8px; }
+
+    .btn-create {
+        padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; font-family: 'Inter', sans-serif;
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+        background: #003a9b; color: #fff; border: none; outline: none; transition: all 0.15s;
+        box-shadow: 0 4px 10px rgba(0,58,155,0.15);
+    }
+    .btn-create:hover { background: #002d7a; transform: translateY(-1px); }
+
+    /* Grid Layout */
+    .rj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 24px; }
+
+    /* Job Card */
+    .rj-card {
+        background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+        overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .rj-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+
+    .rj-card-head { padding: 20px 24px; border-bottom: 1px solid #f1f5f9; position: relative; }
+    .rj-card-head::before {
+        content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+        background: linear-gradient(90deg, #003a9b, #3b82f6);
+    }
+    .rj-card-title { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 6px; line-height: 1.3; padding-right: 50px; }
+    .rj-applicants-badge {
+        position: absolute; top: 20px; right: 20px; background: #eef2ff; color: #003a9b;
+        font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px;
+        display: flex; align-items: center; gap: 4px; border: 1px solid #dbeafe;
+    }
+    .rj-card-desc { font-size: 14px; color: #64748b; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 8px; }
+
+    .rj-card-body { padding: 20px 24px; flex-grow: 1; display: flex; flex-direction: column; gap: 16px; }
+    .rj-meta-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .rj-meta-pill { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
+    .rj-meta-pill.location { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+    .rj-meta-pill.salary { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .rj-meta-pill.type { background: #eff6ff; color: #1e3a8a; border: 1px solid #bfdbfe; }
+    .rj-meta-pill.mode { background: #faf5ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+
+    .rj-skills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .rj-skill { font-size: 11px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
+    
+    .rj-card-footer { padding: 16px 20px; border-top: 1px solid #f1f5f9; background: #f8fafc; display: flex; flex-direction: column; gap: 10px; }
+    
+    .rj-btn-group { display: flex; gap: 8px; }
+    .rj-btn {
+        flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: 'Inter', sans-serif;
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; border: none; transition: 0.15s; outline: none;
+    }
+    .rj-btn.primary { background: #fff; color: #003a9b; border: 1px solid #cbd5e1; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .rj-btn.primary:hover { background: #f8fafc; border-color: #003a9b; }
+    .rj-btn.pro { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+    .rj-btn.pro:hover:not(:disabled) { background: #fef3c7; border-color: #fcd34d; }
+    .rj-btn.pro:disabled { opacity: 0.7; cursor: not-allowed; }
+    .rj-btn.pro-active { background: #eef2ff; color: #4338ca; border: 1px solid #c7d2fe; }
+    .rj-btn.pro-active:hover { background: #e0e7ff; border-color: #a5b4fc; }
+
+    .rj-btn.outline { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+    .rj-btn.outline:hover { background: #f1f5f9; color: #0f172a; border-color: #cbd5e1; }
+    .rj-btn.danger { background: #fff; color: #ef4444; border: 1px solid #fecaca; }
+    .rj-btn.danger:hover { background: #fef2f2; border-color: #fca5a5; }
+
+    .rj-date { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #94a3b8; font-weight: 500; padding: 0 4px; }
+    
+    @media (max-width: 600px) {
+        .rj-header { flex-direction: column; align-items: flex-start; }
+        .rj-grid { grid-template-columns: 1fr; }
+    }
+`;
 
 export default function RecruiterJobsPage() {
     const router = useRouter();
@@ -108,192 +186,145 @@ export default function RecruiterJobsPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <Loader2 className="h-8 w-8 animate-spin" />
+            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 100 }}>
+                <Loader2 className="animate-spin text-blue-600" size={32} />
             </div>
         );
     }
 
     if (jobs.length === 0) {
         return (
-            <div className="p-6 text-center">
-                <p className="text-muted-foreground">You have not posted any jobs yet.</p>
-                <Button onClick={() => router.push("/dashboard/recruiter/jobs/create")} className="mt-4">
-                    <Briefcase className="mr-2 h-4 w-4" />
-                    Post a Job
-                </Button>
+            <div className="rj-wrap">
+                <style dangerouslySetInnerHTML={{ __html: css }} />
+                <div className="rj-header">
+                    <div>
+                        <h1 className="rj-title">My Job Postings</h1>
+                        <p className="rj-subtitle">Manage your job listings and track applications</p>
+                    </div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '100px 0', background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0' }}>
+                    <Briefcase size={48} color="#cbd5e1" style={{ margin: '0 auto 16px' }} />
+                    <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>No jobs posted yet</h3>
+                    <p style={{ fontSize: 14, color: '#64748b', marginBottom: 24 }}>Get started by creating your first job listing.</p>
+                    <button className="btn-create" onClick={() => router.push("/dashboard/recruiter/jobs/create")}>
+                        <Briefcase size={16} /> Post a Job
+                    </button>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
+        <div className="rj-wrap">
+            <style dangerouslySetInnerHTML={{ __html: css }} />
+            
+            <div className="rj-header">
                 <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                        My Job Postings
-                    </h1>
-                    <p className="text-muted-foreground mt-1">Manage your job listings and track applications</p>
+                    <h1 className="rj-title">My Job Postings</h1>
+                    <p className="rj-subtitle">Manage your job listings and track applications</p>
                 </div>
-                <Button onClick={() => router.push("/dashboard/recruiter/jobs/create")} size="lg" className="shadow-lg">
-                    <Briefcase className="mr-2 h-4 w-4" />
-                    Post New Job
-                </Button>
+                <button className="btn-create" onClick={() => router.push("/dashboard/recruiter/jobs/create")}>
+                    <Briefcase size={16} /> Post New Job
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="rj-grid">
                 {jobs.map((job) => (
-                    <Card key={job.id} className="group hover:shadow-2xl transition-all duration-300 border-2 hover:border-primary/50 overflow-hidden">
-                        {/* Gradient Header */}
-                        <div className="h-2 bg-gradient-to-r from-primary via-purple-500 to-pink-500" />
-
-                        <CardContent className="p-6 space-y-4">
-                            {/* Title & Badge */}
-                            <div className="space-y-3">
-                                <div className="flex items-start justify-between gap-3">
-                                    <h3 className="text-xl font-bold line-clamp-2 group-hover:text-primary transition-colors">
-                                        {job.title}
-                                    </h3>
-                                    <Badge variant="secondary" className="shrink-0 shadow-sm">
-                                        <Users className="h-3 w-3 mr-1" />
-                                        {job.applicantCount || 0}
-                                    </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                                    {job.description}
-                                </p>
+                    <div key={job.id} className="rj-card">
+                        <div className="rj-card-head">
+                            <h3 className="rj-card-title" title={job.title}>{job.title}</h3>
+                            <div className="rj-applicants-badge" title="Total Applicants">
+                                <Users size={12} strokeWidth={3} /> {job.applicantCount || 0}
                             </div>
+                            <p className="rj-card-desc">{job.description}</p>
+                        </div>
 
-                            {/* Job Details */}
-                            <div className="flex flex-wrap gap-3 text-sm">
+                        <div className="rj-card-body">
+                            {/* Meta Badges */}
+                            <div className="rj-meta-row">
                                 {job.location && (
-                                    <div className="flex items-center gap-1.5 text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
-                                        <MapPin className="h-3.5 w-3.5" />
-                                        <span className="font-medium">{job.location}</span>
+                                    <div className="rj-meta-pill location">
+                                        <MapPin size={12} /> {job.location}
                                     </div>
                                 )}
                                 {job.salary && (
-                                    <div className="flex items-center gap-1.5 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full">
-                                        <DollarSign className="h-3.5 w-3.5" />
-                                        <span className="font-medium">{job.salary}</span>
+                                    <div className="rj-meta-pill salary">
+                                        <DollarSign size={12} /> {job.salary}
+                                    </div>
+                                )}
+                                {job.jobType && (
+                                    <div className="rj-meta-pill type">
+                                        {job.jobType}
+                                    </div>
+                                )}
+                                {job.workMode && (
+                                    <div className="rj-meta-pill mode">
+                                        {job.workMode}
                                     </div>
                                 )}
                             </div>
 
-                            {/* Type & Mode Badges */}
-                            {(job.jobType || job.workMode) && (
-                                <div className="flex flex-wrap gap-2">
-                                    {job.jobType && (
-                                        <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                                            {job.jobType}
-                                        </Badge>
-                                    )}
-                                    {job.workMode && (
-                                        <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">
-                                            {job.workMode}
-                                        </Badge>
+                            {/* Skills snippet */}
+                            {job.requirements && job.requirements.length > 0 && (
+                                <div className="rj-skills">
+                                    {job.requirements.slice(0, 4).map((req, i) => (
+                                        <div key={i} className="rj-skill">{req}</div>
+                                    ))}
+                                    {job.requirements.length > 4 && (
+                                        <div className="rj-skill" style={{ background: '#e2e8f0' }}>+{job.requirements.length - 4}</div>
                                     )}
                                 </div>
                             )}
+                        </div>
 
-                            {/* Skills */}
-                            <div className="flex flex-wrap gap-2">
-                                {job.requirements.slice(0, 4).map((req, i) => (
-                                    <Badge key={i} variant="secondary" className="text-xs font-medium">
-                                        {req}
-                                    </Badge>
-                                ))}
-                                {job.requirements.length > 4 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                        +{job.requirements.length - 4}
-                                    </Badge>
-                                )}
+                        <div className="rj-card-footer">
+                            <div className="rj-btn-group">
+                                <button className="rj-btn primary" onClick={() => router.push(`/dashboard/recruiter/jobs/${job.id}/applications`)}>
+                                    <Users size={14} /> Applicants
+                                </button>
+                                <button 
+                                    className={`rj-btn ${isPro ? 'pro-active' : 'pro'}`}
+                                    onClick={() => !isPro ? subscribe('PRO', 999) : router.push(`/dashboard/recruiter/jobs/${job.id}/candidates`)}
+                                    disabled={subscribing}
+                                >
+                                    {subscribing ? <Loader2 size={14} className="animate-spin" /> : (!isPro ? <Crown size={14} /> : <Sparkles size={14} />)}
+                                    {subscribing ? 'Processing...' : (!isPro ? 'Unlock AI Ranks' : 'AI Rankings')}
+                                </button>
                             </div>
-
-                            {/* Date */}
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
-                                <Calendar className="h-3 w-3" />
-                                <span>Posted {new Date(job.createdAt).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                })}</span>
+                            <div className="rj-btn-group">
+                                <button className="rj-btn outline" onClick={() => router.push(`/dashboard/recruiter/jobs/${job.id}/edit`)}>
+                                    <Pencil size={14} /> Edit
+                                </button>
+                                <button className="rj-btn danger" onClick={() => handleDeleteClick(job.id)}>
+                                    <Trash2 size={14} /> Delete
+                                </button>
                             </div>
-
-                            {/* Action Buttons */}
-                            <div className="space-y-2 pt-2">
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button
-                                        variant="default"
-                                        size="sm"
-                                        className="w-full shadow-md hover:shadow-lg transition-shadow"
-                                        onClick={() => router.push(`/dashboard/recruiter/jobs/${job.id}/applications`)}
-                                    >
-                                        <Users className="h-3.5 w-3.5 mr-1.5" />
-                                        Applications
-                                    </Button>
-                                    <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        className={`w-full shadow-md hover:shadow-lg transition-shadow ${!isPro ? 'bg-amber-100 text-amber-900 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-100' : ''}`}
-                                        onClick={() => !isPro ? subscribe('PRO', 999) : router.push(`/dashboard/recruiter/jobs/${job.id}/candidates`)}
-                                        disabled={subscribing}
-                                    >
-                                        {!isPro ? <Crown className="h-3.5 w-3.5 mr-1.5" /> : <Trophy className="h-3.5 w-3.5 mr-1.5" />}
-                                        {subscribing ? 'Processing...' : (!isPro ? 'Unlock Rankings' : 'Rankings')}
-                                    </Button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full"
-                                        onClick={() => router.push(`/dashboard/recruiter/jobs/${job.id}/edit`)}
-                                    >
-                                        <Pencil className="h-3 w-3 mr-1.5" />
-                                        Edit
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                                        onClick={() => handleDeleteClick(job.id)}
-                                    >
-                                        <Trash2 className="h-3 w-3 mr-1.5" />
-                                        Delete
-                                    </Button>
-                                </div>
+                            <div className="rj-date">
+                                <span><Calendar size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} /> Posted</span>
+                                <span>{new Date(job.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 ))}
             </div>
 
             {/* Delete Confirmation Dialog */}
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <AlertDialogContent>
+                <AlertDialogContent style={{ borderRadius: 16 }}>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogTitle style={{ fontSize: 20 }}>Delete Job Posting</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete this job posting and all associated applications.
-                            This action cannot be undone.
+                            Are you sure you want to permanently delete this job and all its application records? This action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeleting} style={{ borderRadius: 8 }}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleDeleteConfirm}
                             disabled={isDeleting}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            style={{ background: '#ef4444', color: '#fff', borderRadius: 8 }}
                         >
-                            {isDeleting ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Deleting...
-                                </>
-                            ) : (
-                                "Delete Job"
-                            )}
+                            {isDeleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</> : "Yes, Delete Job"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -301,4 +332,3 @@ export default function RecruiterJobsPage() {
         </div>
     );
 }
-
