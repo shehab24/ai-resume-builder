@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 // Constants and Components
 import { TEMPLATES, Resume, ResumeLimit } from "./constants";
-import { TemplateSelector } from "./_components/TemplateSelector";
+// import { TemplateSelector } from "./_components/TemplateSelector";
 import { MultiStepForm } from "./_components/MultiStepForm";
 import { ResumeList } from "./_components/ResumeList";
 import { ResumeDesignPanel } from "./_components/ResumeDesignPanel";
@@ -17,6 +17,9 @@ import { ResumeEditForm } from "./_components/ResumeEditForm";
 import { ResumePreviewActions } from "./_components/ResumePreviewActions";
 import { UnauthenticatedBanner } from "./_components/UnauthenticatedBanner";
 import { CreateResumeDialogs } from "./_components/CreateResumeDialogs";
+import { ExperienceLevelModal } from "./_components/ExperienceLevelModal";
+import { useAppDispatch } from "@/lib/store/hooks";
+import { updateBasicInfo } from "@/lib/store/resumeSlice";
 
 export default function CreateResumePage() {
     const { isSignedIn } = useAuth();
@@ -36,6 +39,8 @@ export default function CreateResumePage() {
     const [editableResume, setEditableResume] = useState<any>(null);
     const [showEditMode, setShowEditMode] = useState(false);
     const [showDesignPanel, setShowDesignPanel] = useState(false);
+    const [showExperienceModal, setShowExperienceModal] = useState(false);
+    const dispatch = useAppDispatch();
 
     useEffect(() => {
         fetchAllResumes();
@@ -44,6 +49,12 @@ export default function CreateResumePage() {
         // Load saved template draft
         const savedTemplate = localStorage.getItem("resume_template_draft");
         if (savedTemplate) setSelectedTemplate(savedTemplate);
+
+        // Check if experience level has been selected before
+        const experienceSelected = sessionStorage.getItem("experience_level_selected");
+        if (!experienceSelected) {
+            setShowExperienceModal(true);
+        }
     }, []);
 
     useEffect(() => {
@@ -303,6 +314,20 @@ export default function CreateResumePage() {
         }
     };
 
+    const handleExperienceLevelSelect = (levelId: string) => {
+        // Map levelId to years of experience
+        const mapping: Record<string, string> = {
+            "no-experience": "0",
+            "entry-level": "1",
+            "mid-level": "5",
+            "senior-level": "10"
+        };
+        
+        dispatch(updateBasicInfo({ careerLevel: mapping[levelId] || "0" }));
+        sessionStorage.setItem("experience_level_selected", "true");
+        setShowExperienceModal(false);
+    };
+
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             {/* Header */}
@@ -336,15 +361,12 @@ export default function CreateResumePage() {
                         {/* Main Content - Template Selection & Multi-Step Form */}
                     {!showPreview && (
                         <div className="space-y-8">
-                                <TemplateSelector
-                                    selectedTemplate={selectedTemplate}
-                                    onSelect={setSelectedTemplate}
-                                    onPreview={setPreviewImage}
-                                />
-
                                 <MultiStepForm
                                     handleGenerate={handleGenerate}
                                     isGenerating={isGenerating}
+                                    selectedTemplate={selectedTemplate}
+                                    setSelectedTemplate={setSelectedTemplate}
+                                    setPreviewImage={setPreviewImage}
                                 />
                         </div>
                     )}
@@ -424,6 +446,12 @@ export default function CreateResumePage() {
                 setPreviewImage={setPreviewImage}
                 showLoginPrompt={showLoginPrompt}
                 setShowLoginPrompt={setShowLoginPrompt}
+            />
+
+            <ExperienceLevelModal
+                isOpen={showExperienceModal}
+                onClose={() => setShowExperienceModal(false)}
+                onSelect={handleExperienceLevelSelect}
             />
         </div>
     );

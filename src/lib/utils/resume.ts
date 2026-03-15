@@ -8,7 +8,7 @@ export function buildAIPrompt(resumeState: ResumeState): string {
 BASIC INFORMATION:
 - Name: ${basicInfo.fullName}
 - Title: ${basicInfo.title}
-- Experience: ${basicInfo.yearsOfExperience} years
+- Career Level: ${basicInfo.careerLevel}
 - Email: ${basicInfo.email}
 - Phone: ${basicInfo.phone}
 - Location: ${basicInfo.location}

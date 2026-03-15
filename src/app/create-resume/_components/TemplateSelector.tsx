@@ -9,10 +9,11 @@ import { TEMPLATES } from "../constants";
 interface TemplateSelectorProps {
     selectedTemplate: string;
     onSelect: (id: string) => void;
-    onPreview: (image: string) => void;
+    onPreview: (image: string | null) => void;
+    onNext?: () => void;
 }
 
-export function TemplateSelector({ selectedTemplate, onSelect, onPreview }: TemplateSelectorProps) {
+export function TemplateSelector({ selectedTemplate, onSelect, onPreview, onNext }: TemplateSelectorProps) {
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewImage, setPreviewImage] = useState("");
 
@@ -24,16 +25,8 @@ export function TemplateSelector({ selectedTemplate, onSelect, onPreview }: Temp
 
     return (
         <>
-            <Card className="border-2">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-primary" />
-                        Step 1: Choose Your Template
-                    </CardTitle>
-                    <CardDescription className="text-sm">Select a design that matches your style and industry</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="space-y-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                         {TEMPLATES.map((template) => (
                             <div
                                 key={template.id}
@@ -78,8 +71,15 @@ export function TemplateSelector({ selectedTemplate, onSelect, onPreview }: Temp
                             </div>
                         ))}
                     </div>
-                </CardContent>
-            </Card>
+
+                {onNext && (
+                    <div className="flex justify-end pt-4">
+                        <Button onClick={onNext}>
+                            Next Step
+                        </Button>
+                    </div>
+                )}
+            </div>
 
             {/* Full Screen Preview Modal */}
             {previewOpen && (

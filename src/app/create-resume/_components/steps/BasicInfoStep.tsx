@@ -8,18 +8,22 @@ import { updateBasicInfo } from "../../../../lib/store/resumeSlice";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { ReusableSelect } from "@/components/ui/reusable-select";
+import { Controller } from "react-hook-form";
 
 interface BasicInfoStepProps {
   onNext: () => void;
+  onBack?: () => void;
 }
 
-export function BasicInfoStep({ onNext }: BasicInfoStepProps) {
+export function BasicInfoStep({ onNext, onBack }: BasicInfoStepProps) {
   const dispatch = useAppDispatch();
   const basicInfo = useAppSelector((state) => state.resume.basicInfo);
 
   const {
     register,
     handleSubmit,
+    control: formControl,
     formState: { errors, isValid },
   } = useForm<BasicInfoFormData>({
     resolver: zodResolver(basicInfoSchema),
@@ -48,9 +52,25 @@ export function BasicInfoStep({ onNext }: BasicInfoStepProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="yearsOfExperience">Years of Experience</Label>
-          <Input id="yearsOfExperience" type="number" {...register("yearsOfExperience")} placeholder="5" />
-          {errors.yearsOfExperience && <p className="text-sm text-red-500">{errors.yearsOfExperience.message}</p>}
+          <Controller
+            name="careerLevel"
+            control={formControl}
+            render={({ field }) => (
+              <ReusableSelect
+                label="Career Level"
+                placeholder="Select your career level..."
+                options={[
+                  { value: "Student", label: "Student" },
+                  { value: "Recent Graduate", label: "Recent Graduate" },
+                  { value: "Entry Level", label: "Entry Level" },
+                  { value: "Career Switcher", label: "Career Switcher" },
+                ]}
+                value={field.value ? { value: field.value, label: field.value } : null}
+                onChange={(option: any) => field.onChange(option?.value)}
+                error={errors.careerLevel?.message}
+              />
+            )}
+          />
         </div>
 
         <div className="space-y-2">
@@ -72,7 +92,14 @@ export function BasicInfoStep({ onNext }: BasicInfoStepProps) {
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-between mt-8">
+        {onBack ? (
+          <Button type="button" variant="outline" onClick={onBack}>
+            Back
+          </Button>
+        ) : (
+          <div></div>
+        )}
         <Button type="submit" disabled={!isValid}>
           Next Step
         </Button>
