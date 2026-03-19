@@ -9,6 +9,7 @@ const isPublicRoute = createRouteMatcher([
   '/create-resume(.*)',
   '/dashboard/job-seeker/resume/create(.*)',
   '/api/resume/preview(.*)',
+  '/api/job-suggestions(.*)',
   '/payment(.*)',
   '/webhooks(.*)',
 ]);

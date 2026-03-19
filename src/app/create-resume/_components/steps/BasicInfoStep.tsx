@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { basicInfoSchema, BasicInfoFormData } from "../../../../lib/validations/resume";
@@ -19,6 +20,9 @@ interface BasicInfoStepProps {
 export function BasicInfoStep({ onNext, onBack }: BasicInfoStepProps) {
   const dispatch = useAppDispatch();
   const basicInfo = useAppSelector((state) => state.resume.basicInfo);
+  const [jobTitleOptions, setJobTitleOptions] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const {
     register,
@@ -27,9 +31,35 @@ export function BasicInfoStep({ onNext, onBack }: BasicInfoStepProps) {
     formState: { errors, isValid },
   } = useForm<BasicInfoFormData>({
     resolver: zodResolver(basicInfoSchema),
-    defaultValues: basicInfo,
+    defaultValues: {
+      ...basicInfo,
+      careerLevel: "Student",
+    },
     mode: "onChange",
   });
+
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (searchQuery.length < 2) {
+        setJobTitleOptions([]);
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        const response = await fetch(`/api/job-suggestions?q=${encodeURIComponent(searchQuery)}`);
+        const data = await response.json();
+        setJobTitleOptions(data.suggestions || []);
+      } catch (error) {
+        console.error("Error fetching job suggestions:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    const timer = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const onSubmit = (data: BasicInfoFormData) => {
     dispatch(updateBasicInfo(data));
@@ -46,9 +76,27 @@ export function BasicInfoStep({ onNext, onBack }: BasicInfoStepProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="title">Job Title</Label>
-          <Input id="title" {...register("title")} placeholder="Software Engineer" />
-          {errors.title && <p className="text-sm text-red-500">{errors.title.message}</p>}
+          <Controller
+            name="title"
+            control={formControl}
+            render={({ field }) => (
+              <ReusableSelect
+                label="Job Title"
+                placeholder="Search job title..."
+                isSearchable={true}
+                isLoading={isSearching}
+                options={jobTitleOptions}
+                value={field.value ? { value: field.value, label: field.value } : null}
+                onInputChange={(newValue, actionMeta) => {
+                  if (actionMeta.action === "input-change") {
+                    setSearchQuery(newValue);
+                  }
+                }}
+                onChange={(option: any) => field.onChange(option?.value)}
+                error={errors.title?.message}
+              />
+            )}
+          />
         </div>
 
         <div className="space-y-2">

@@ -11,6 +11,7 @@ interface Option {
 interface CustomSelectProps extends Omit<SelectProps<Option, false>, 'styles' | 'instanceId'> {
   label?: string;
   error?: string;
+  isSearchable?: boolean;
 }
 
 const customStyles: StylesConfig<Option, false> = {
@@ -29,13 +30,18 @@ const customStyles: StylesConfig<Option, false> = {
   option: (base, state) => ({
     ...base,
     backgroundColor: state.isSelected 
-      ? "hsl(var(--primary))" 
+      ? "black" 
       : state.isFocused 
-        ? "hsl(var(--primary) / 0.1)" 
+        ? "#e5e7eb" 
         : "transparent",
-    color: state.isSelected ? "white" : "hsl(var(--foreground))",
+    color: state.isSelected 
+      ? "white" 
+      : state.isFocused 
+        ? "#111827" 
+        : "hsl(var(--foreground))",
     "&:active": {
-      backgroundColor: "hsl(var(--primary))",
+      backgroundColor: "black",
+      color: "white",
     },
     cursor: "pointer",
   }),
@@ -45,6 +51,11 @@ const customStyles: StylesConfig<Option, false> = {
     border: "1px solid hsl(var(--border))",
     boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
     backgroundColor: "white",
+    zIndex: 9999,
+  }),
+  menuPortal: (base) => ({
+    ...base,
+    zIndex: 9999,
   }),
   placeholder: (base) => ({
     ...base,
@@ -60,7 +71,7 @@ const customStyles: StylesConfig<Option, false> = {
   }),
 };
 
-export function ReusableSelect({ label, error, ...props }: CustomSelectProps) {
+export function ReusableSelect({ label, error, isSearchable = true, ...props }: CustomSelectProps) {
   const instanceId = useId();
 
   return (
@@ -73,6 +84,11 @@ export function ReusableSelect({ label, error, ...props }: CustomSelectProps) {
       <Select
         instanceId={instanceId}
         styles={customStyles}
+        isSearchable={isSearchable}
+        menuPortalTarget={typeof document !== "undefined" ? document.body : null}
+        formatOptionLabel={(option: Option) => (
+          <div dangerouslySetInnerHTML={{ __html: option.label }} />
+        )}
         {...props}
       />
       {error && <p className="text-sm text-red-500">{error}</p>}
