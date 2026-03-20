@@ -35,8 +35,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "You are already on this role" }, { status: 400 });
         }
 
-        // If switching to RECRUITER, check if approved
+        // If switching to RECRUITER, check status
         if (newRole === "RECRUITER") {
+            if ((user.recruiterStatus as string) === "BLOCKED") {
+                return NextResponse.json({
+                    error: "Your recruiter access has been blocked by an administrator"
+                }, { status: 403 });
+            }
             if (user.recruiterStatus !== "APPROVED") {
                 return NextResponse.json({
                     error: "Your recruiter application must be approved first"

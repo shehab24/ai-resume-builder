@@ -3,21 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+    Dialog, DialogContent, DialogDescription,
+    DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, MapPin, DollarSign, Zap, Briefcase, Calendar, ExternalLink, Clock, Crown, Users, ArrowRightLeft } from "lucide-react";
+import {
+    Loader2, MapPin, DollarSign, Zap, Briefcase, ExternalLink,
+    Clock, Crown, Users, ArrowRightLeft, Search, SlidersHorizontal,
+    Building2, Sparkles, ChevronRight, TrendingUp,
+} from "lucide-react";
 import { toast } from "sonner";
-import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { useSubscription } from "@/hooks/use-subscription";
-import { useRouter } from "next/navigation";
 
 interface Job {
     id: string;
@@ -27,6 +24,8 @@ interface Job {
     salary: string;
     requirements: string[];
     createdAt: string;
+    jobType?: string;
+    workMode?: string;
     isExternal?: boolean;
     externalUrl?: string;
     applicationMethod?: string;
@@ -37,111 +36,331 @@ interface Job {
     source?: { name: string };
 }
 
-export default function FindJobsPage() {
-    const router = useRouter();
-    const [jobs, setJobs] = useState<Job[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [autoApply, setAutoApply] = useState(false);
-    const [updatingAutoApply, setUpdatingAutoApply] = useState(false);
-    const [isPro, setIsPro] = useState(false);
-    const { subscribe, loading: subscribing } = useSubscription();
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-    const [showSwitchDialog, setShowSwitchDialog] = useState(false);
-    const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-    const [switchingRole, setSwitchingRole] = useState(false);
+/* ─────────────────────────────────────────────
+   Inline styles — consistent with TalentFlow
+   sidebar brand (#003a9b, Inter, clean whites)
+───────────────────────────────────────────── */
+const css = `
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
+    .jb-wrap    { font-family: 'Inter', sans-serif; }
+    .jb-header  { margin-bottom: 28px; }
+    .jb-title   { font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.4px; }
+    .jb-sub     { font-size: 14px; color: #64748b; margin-top: 4px; }
+
+    /* ── search / filters bar ── */
+    .jb-bar {
+        display: flex; gap: 12px; flex-wrap: wrap;
+        background: #fff; border: 1px solid #e2e8f0;
+        border-radius: 14px; padding: 14px 18px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+        margin-bottom: 24px;
+    }
+    .jb-search-wrap { position: relative; flex: 1; min-width: 220px; }
+    .jb-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+    .jb-search {
+        width: 100%; padding: 9px 12px 9px 38px;
+        border: 1.5px solid #e2e8f0; border-radius: 10px;
+        font-size: 14px; font-family: 'Inter', sans-serif; color: #1e293b;
+        outline: none; transition: border 150ms;
+    }
+    .jb-search:focus { border-color: #003a9b; }
+    .jb-filter-btn {
+        display: flex; align-items: center; gap: 6px;
+        padding: 9px 14px; border: 1.5px solid #e2e8f0;
+        border-radius: 10px; font-size: 13px; font-weight: 500;
+        color: #64748b; background: #fff; cursor: pointer;
+        transition: all 120ms; white-space: nowrap;
+        font-family: 'Inter', sans-serif;
+    }
+    .jb-filter-btn:hover, .jb-filter-btn.active { border-color: #003a9b; color: #003a9b; background: #eef2ff; }
+
+    /* ── auto-apply banner ── */
+    .jb-autoapply {
+        display: flex; align-items: center; gap: 14px;
+        background: linear-gradient(135deg, #003a9b 0%, #1d4ed8 100%);
+        color: #fff; border-radius: 14px; padding: 16px 20px;
+        margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0,58,155,0.2);
+    }
+    .jb-autoapply-icon {
+        width: 44px; height: 44px; border-radius: 12px;
+        background: rgba(255,255,255,0.18);
+        display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .jb-autoapply-title { font-size: 15px; font-weight: 700; }
+    .jb-autoapply-sub   { font-size: 12px; opacity: .8; margin-top: 2px; }
+    .jb-toggle {
+        position: relative; width: 48px; height: 26px;
+        background: rgba(255,255,255,0.25); border-radius: 999px;
+        border: none; cursor: pointer; transition: background 200ms; flex-shrink: 0;
+    }
+    .jb-toggle.on  { background: #22c55e; }
+    .jb-toggle::after {
+        content: ''; position: absolute; top: 3px; left: 3px;
+        width: 20px; height: 20px; border-radius: 50%; background: #fff;
+        transition: transform 200ms;
+    }
+    .jb-toggle.on::after { transform: translateX(22px); }
+    .jb-toggle:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* pro upsell inside banner */
+    .jb-upgrade-btn {
+        padding: 7px 16px; background: #f59e0b; color: #fff;
+        border: none; border-radius: 8px; font-size: 12px; font-weight: 700;
+        cursor: pointer; white-space: nowrap; font-family: 'Inter', sans-serif;
+        transition: background 150ms; flex-shrink: 0;
+    }
+    .jb-upgrade-btn:hover { background: #d97706; }
+
+    /* ── count row ── */
+    .jb-count-row {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 16px;
+    }
+    .jb-count { font-size: 13px; font-weight: 600; color: #64748b; }
+    .jb-count span { color: #003a9b; }
+
+    /* ── list / row layout ── */
+    .jb-grid { display: flex; flex-direction: column; gap: 12px; }
+
+    /* ── job card ── */
+    .jb-card {
+        background: #fff; border: 1px solid #e2e8f0;
+        border-radius: 12px; overflow: hidden;
+        display: flex; flex-direction: row; align-items: stretch;
+        transition: box-shadow 180ms, border-color 180ms, transform 180ms;
+        cursor: default; min-height: 100px;
+    }
+    .jb-card:hover {
+        box-shadow: 0 4px 16px rgba(0,58,155,0.08);
+        border-color: #cbd5e1;
+        transform: translateY(-1px);
+    }
+    .jb-card-accent { width: 4px; flex-shrink: 0; }
+    .jb-card-accent.internal { background: linear-gradient(180deg, #003a9b, #2563eb); }
+    .jb-card-accent.external { background: linear-gradient(180deg, #7c3aed, #a855f7); }
+    .jb-card-accent.own      { background: linear-gradient(180deg, #0891b2, #0ea5e9); }
+
+    .jb-card-body { 
+        padding: 18px 20px; flex: 1; 
+        display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 20px;
+    }
+
+    /* main info (left side) */
+    .jb-main-info { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; }
+    
+    .jb-logo {
+        width: 48px; height: 48px; border-radius: 10px; flex-shrink: 0;
+        background: #eef2ff; display: flex; align-items: center; justify-content: center;
+    }
+    .jb-logo.ext { background: #f3e8ff; }
+    .jb-logo.own { background: #e0f2fe; }
+    
+    .jb-card-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+    .jb-job-title {
+        font-size: 15px; font-weight: 700; color: #0f172a;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    
+    .jb-meta-row {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .jb-company {
+        font-size: 13px; color: #475569; font-weight: 500;
+        display: flex; align-items: center; gap: 4px;
+    }
+    .jb-meta-dot { color: #cbd5e1; font-size: 10px; }
+
+    /* chips */
+    .jb-chips { display: flex; align-items: center; gap: 6px; }
+    .jb-chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 4px 8px; border-radius: 6px;
+        font-size: 11px; font-weight: 600;
+        font-family: 'Inter', sans-serif; white-space: nowrap;
+    }
+    .jb-chip.loc   { background: #f1f5f9; color: #475569; }
+    .jb-chip.sal   { background: #f0fdf4; color: #16a34a; }
+    .jb-chip.ext   { background: #faf5ff; color: #7c3aed; }
+    .jb-chip.own   { background: #eff6ff; color: #1d4ed8; }
+    .jb-chip.type  { background: #fff7ed; color: #ea580c; }
+    .jb-chip.mode  { background: #ecfeff; color: #0891b2; }
+
+    /* skill tags */
+    .jb-skills { display: flex; align-items: center; gap: 5px; margin-top: 8px; flex-wrap: wrap; }
+    .jb-skill {
+        padding: 3px 8px; background: #f8fafc; border: 1px solid #e2e8f0;
+        border-radius: 6px; font-size: 11px; font-weight: 500;
+        color: #475569; font-family: 'Inter', sans-serif;
+        max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* right side (date + action button) */
+    .jb-card-right { 
+        display: flex; flex-direction: row; align-items: center; gap: 24px; flex-shrink: 0;
+    }
+    
+    .jb-posted {
+        font-size: 12px; color: #94a3b8; white-space: nowrap;
+        display: flex; align-items: center; gap: 4px;
+    }
+
+    /* action buttons */
+    .jb-apply-btn {
+        padding: 9px 18px;
+        border-radius: 8px; border: none;
+        font-size: 13px; font-weight: 600;
+        font-family: 'Inter', sans-serif; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+        transition: all 150ms; white-space: nowrap; min-width: 130px;
+    }
+    .jb-apply-btn.primary { background: #003a9b; color: #fff; }
+    .jb-apply-btn.primary:hover { background: #002d7a; }
+    .jb-apply-btn.purple  { background: #7c3aed; color: #fff; }
+    .jb-apply-btn.purple:hover  { background: #6d28d9; }
+    .jb-apply-btn.outline { background: #fff; color: #003a9b; border: 1.5px solid #c7d6f5; }
+    .jb-apply-btn.outline:hover { background: #eef2ff; }
+
+    /* empty state */
+    .jb-empty {
+        text-align: center; padding: 80px 20px;
+        display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+    .jb-empty-icon {
+        width: 72px; height: 72px; border-radius: 20px;
+        background: #f1f5f9; display: flex; align-items: center; justify-content: center;
+    }
+    .jb-empty h3 { font-size: 17px; font-weight: 700; color: #0f172a; }
+    .jb-empty p  { font-size: 14px; color: #64748b; max-width: 320px; line-height: 1.6; }
+
+    /* loader */
+    .jb-loading {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        min-height: 300px; gap: 14px;
+    }
+    .jb-spinner {
+        width: 36px; height: 36px; border: 3px solid #e2e8f0;
+        border-top-color: #003a9b; border-radius: 50%;
+        animation: jb-spin 0.8s linear infinite;
+    }
+    @keyframes jb-spin { to { transform: rotate(360deg); } }
+    .jb-loading p { font-size: 14px; color: #64748b; font-family: 'Inter', sans-serif; }
+
+    @media (max-width: 640px) {
+        .jb-autoapply { flex-wrap: wrap; }
+    }
+    @media (max-width: 768px) {
+        .jb-card-body { flex-direction: column; align-items: flex-start; gap: 16px; }
+        .jb-card-right { width: 100%; justify-content: space-between; }
+        .jb-main-info { width: 100%; }
+        .jb-meta-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+        .jb-chips { flex-wrap: wrap; }
+    }
+`;
+
+function timeAgo(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const d = Math.floor(diff / 86400000);
+    if (d === 0) return "Today";
+    if (d === 1) return "Yesterday";
+    if (d < 7)  return `${d} days ago`;
+    if (d < 30) return `${Math.floor(d / 7)}w ago`;
+    return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+export default function FindJobsPage() {
+    const [jobs, setJobs]         = useState<Job[]>([]);
+    const [filtered, setFiltered] = useState<Job[]>([]);
+    const [loading, setLoading]   = useState(true);
+    const [autoApply, setAutoApply]       = useState(false);
+    const [updatingAA, setUpdatingAA]     = useState(false);
+    const [isPro, setIsPro]               = useState(false);
     const [matchThreshold, setMatchThreshold] = useState(95);
+    const [currentUserId, setCurrentUserId]   = useState<string | null>(null);
+    const [search, setSearch]     = useState("");
+    const [typeFilter, setTypeFilter] = useState<"all" | "internal" | "external">("all");
+
+    // Switch role dialog
+    const [showSwitchDialog, setShowSwitchDialog] = useState(false);
+    const [selectedJobId, setSelectedJobId]       = useState<string | null>(null);
+    const [switchingRole, setSwitchingRole]       = useState(false);
+
+    const { subscribe, loading: subscribing } = useSubscription();
 
     useEffect(() => {
-        // Fetch user profile first, then jobs
-        const initializeData = async () => {
-            await fetchAutoApplyStatus(); // This sets currentUserId
+        (async () => {
+            await fetchProfile();
             await fetchJobs();
-            await fetchSubscriptionStatus();
-        };
-        initializeData();
+            await fetchSubStatus();
+        })();
     }, []);
 
-    // Debug: Log when currentUserId changes
+    // Live filter
     useEffect(() => {
-        console.log("[Frontend] currentUserId changed to:", currentUserId);
-    }, [currentUserId]);
-
-    // Debug: Log when jobs change
-    useEffect(() => {
-        console.log("[Frontend] jobs changed, count:", jobs.length);
-        if (jobs.length > 0 && currentUserId) {
-            console.log("[Frontend] Sample job recruiterId:", jobs[0].recruiterId);
-            console.log("[Frontend] Current userId:", currentUserId);
-            console.log("[Frontend] Match?", jobs[0].recruiterId === currentUserId);
+        let out = jobs;
+        if (typeFilter === "internal") out = out.filter(j => !j.isExternal);
+        if (typeFilter === "external") out = out.filter(j => j.isExternal);
+        if (search.trim()) {
+            const q = search.toLowerCase();
+            out = out.filter(j =>
+                j.title.toLowerCase().includes(q) ||
+                (j.company || j.recruiter?.name || "").toLowerCase().includes(q) ||
+                j.location?.toLowerCase().includes(q) ||
+                j.requirements.some(r => r.toLowerCase().includes(q))
+            );
         }
-    }, [jobs, currentUserId]);
+        setFiltered(out);
+    }, [jobs, search, typeFilter]);
 
     const fetchJobs = async () => {
         try {
-            const response = await fetch("/api/jobs/match");
-            if (!response.ok) throw new Error("Failed to fetch jobs");
-            const data = await response.json();
-            console.log("[Frontend] Received jobs:", data.length);
-            setJobs(data);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
+            const res = await fetch("/api/jobs/match");
+            if (!res.ok) throw new Error();
+            setJobs(await res.json());
+        } catch { /* silent */ }
+        finally { setLoading(false); }
     };
 
-    const fetchAutoApplyStatus = async () => {
+    const fetchProfile = async () => {
         try {
             const res = await fetch("/api/user/profile");
             if (res.ok) {
-                const data = await res.json();
-                setAutoApply(data.autoApply || false);
-                setMatchThreshold(data.matchThreshold || 95);
-                setCurrentUserId(data.id); // Get current user ID
-                console.log("[Frontend] Current User ID:", data.id);
+                const d = await res.json();
+                setAutoApply(d.autoApply || false);
+                setMatchThreshold(d.matchThreshold || 95);
+                setCurrentUserId(d.id);
             }
-        } catch (error) {
-            console.error(error);
-        }
+        } catch { /* silent */ }
     };
 
-    const fetchSubscriptionStatus = async () => {
+    const fetchSubStatus = async () => {
         try {
             const res = await fetch("/api/user/subscription");
             if (res.ok) {
-                const data = await res.json();
-                setIsPro(data.subscription?.status === 'ACTIVE' && data.subscription?.plan === 'PRO');
+                const d = await res.json();
+                setIsPro(d.subscription?.status === "ACTIVE" && d.subscription?.plan === "PRO");
             }
-        } catch (error) {
-            console.error(error);
-        }
+        } catch { /* silent */ }
     };
 
-    const handleAutoApplyToggle = async (checked: boolean) => {
-        if (!isPro && checked) {
-            toast.error("Auto-Apply is a Pro feature! Upgrade to enable it.");
+    const toggleAutoApply = async () => {
+        if (!isPro && !autoApply) {
+            toast.error("Auto-Apply is a Pro feature. Upgrade to enable it.");
             return;
         }
-
-        setUpdatingAutoApply(true);
+        setUpdatingAA(true);
         try {
+            const next = !autoApply;
             const res = await fetch("/api/user/profile", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ autoApply: checked }),
+                body: JSON.stringify({ autoApply: next }),
             });
-
-            if (!res.ok) throw new Error("Failed to update auto-apply");
-
-            setAutoApply(checked);
-            toast.success(checked ? "Auto-Apply enabled! 🚀" : "Auto-Apply disabled");
-        } catch (error) {
-            console.error(error);
-            toast.error("Failed to update auto-apply setting");
-        } finally {
-            setUpdatingAutoApply(false);
-        }
+            if (!res.ok) throw new Error();
+            setAutoApply(next);
+            toast.success(next ? "Auto-Apply enabled 🚀" : "Auto-Apply disabled");
+        } catch { toast.error("Failed to update Auto-Apply"); }
+        finally { setUpdatingAA(false); }
     };
 
     const handleSwitchToRecruiter = async () => {
@@ -152,230 +371,276 @@ export default function FindJobsPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ newRole: "RECRUITER" }),
             });
-
-            const data = await res.json();
-
+            const d = await res.json();
             if (res.ok) {
-                toast.success("Switched to Recruiter role!");
-                // Redirect to applications page
+                toast.success("Switched to Recruiter!");
                 window.location.href = `/dashboard/recruiter/jobs/${selectedJobId}/applications`;
             } else {
-                toast.error(data.error || "Failed to switch role");
+                toast.error(d.error || "Failed to switch role");
             }
-        } catch (error) {
-            console.error("Error switching role:", error);
-            toast.error("Failed to switch role");
-        } finally {
-            setSwitchingRole(false);
-        }
+        } catch { toast.error("Failed to switch role"); }
+        finally { setSwitchingRole(false); }
     };
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <Loader2 className="h-8 w-8 animate-spin" />
+            <div className="jb-wrap">
+                <style dangerouslySetInnerHTML={{ __html: css }} />
+                <div className="jb-loading">
+                    <div className="jb-spinner" />
+                    <p>Finding matching jobs for you…</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                        Available Jobs
-                    </h1>
-                    <p className="text-muted-foreground mt-2">
-                        Browse {jobs.length} jobs that match your profile
-                    </p>
-                </div>
+        <div className="jb-wrap">
+            <style dangerouslySetInnerHTML={{ __html: css }} />
 
-                {/* Auto-Apply Toggle */}
-                <Card className={`border-2 shadow-lg ${isPro ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950' : 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950'}`}>
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            {isPro ? (
-                                <Zap className="h-5 w-5 text-blue-600" />
-                            ) : (
-                                <Crown className="h-5 w-5 text-amber-600" />
-                            )}
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                    <p className={`font-semibold text-sm ${isPro ? 'text-blue-900 dark:text-blue-100' : 'text-amber-900 dark:text-amber-100'}`}>
-                                        Auto-Apply
-                                    </p>
-                                    {!isPro && (
-                                        <Badge variant="secondary" className="text-[10px] bg-amber-200 text-amber-900">
-                                            PRO
-                                        </Badge>
-                                    )}
-                                </div>
-                                <p className={`text-xs ${isPro ? 'text-blue-700 dark:text-blue-300' : 'text-amber-700 dark:text-amber-300'}`}>
-                                    {isPro ? (autoApply ? "Enabled" : "Disabled") : "Upgrade to Pro to enable"}
-                                </p>
-                            </div>
-                            <input
-                                type="checkbox"
-                                checked={autoApply}
-                                disabled={updatingAutoApply || !isPro}
-                                onChange={(e) => handleAutoApplyToggle(e.target.checked)}
-                                className={`w-12 h-6 rounded-full appearance-none relative transition-colors
-                                           before:content-[''] before:absolute before:w-5 before:h-5 before:rounded-full before:bg-white 
-                                           before:top-0.5 before:left-0.5 before:transition-transform checked:before:translate-x-6
-                                           disabled:opacity-50 disabled:cursor-not-allowed
-                                           ${isPro ? 'bg-gray-300 checked:bg-blue-600' : 'bg-gray-300 cursor-not-allowed'}`}
-                            />
-                        </div>
-                        {isPro && autoApply && (
-                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                                ✓ We'll auto-apply to {matchThreshold}%+ matching jobs
-                            </p>
-                        )}
-                        {!isPro && (
-                            <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800">
-                                <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
-                                    Unlock Auto-Apply and apply to hundreds of jobs automatically!
-                                </p>
-                                <Button
-                                    onClick={() => subscribe('PRO', 299)}
-                                    disabled={subscribing}
-                                    size="sm"
-                                    className="w-full bg-amber-600 hover:bg-amber-700"
-                                >
-                                    <Crown className="h-3 w-3 mr-1" />
-                                    {subscribing ? 'Processing...' : 'Upgrade to Pro - ৳299/month'}
-                                </Button>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+            {/* ── Page Header ── */}
+            <div className="jb-header">
+                <h1 className="jb-title">My Jobs</h1>
+                <p className="jb-sub">
+                    {jobs.length > 0
+                        ? `${jobs.length} jobs matched to your profile · sorted by best fit`
+                        : "No matched jobs yet — complete your profile to unlock matches"}
+                </p>
             </div>
 
-            {jobs.length === 0 ? (
-                <div className="text-center py-12">
-                    <Briefcase className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No Jobs Found</h3>
-                    <p className="text-muted-foreground">
-                        No jobs found matching your profile. Check back later!
-                    </p>
+            {/* ── Auto-Apply Banner ── */}
+            <div className="jb-autoapply">
+                <div className={`jb-autoapply-icon`}>
+                    {isPro ? <Sparkles size={22} /> : <Crown size={22} />}
                 </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {jobs.map((job) => {
-                        const isOwnJob = job.recruiterId === currentUserId;
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="jb-autoapply-title">
+                        Auto-Apply
+                        {!isPro && (
+                            <span style={{
+                                marginLeft: 8, fontSize: 10, fontWeight: 700,
+                                background: "#f59e0b", color: "#fff",
+                                padding: "2px 7px", borderRadius: 999,
+                            }}>
+                                PRO
+                            </span>
+                        )}
+                    </div>
+                    <div className="jb-autoapply-sub">
+                        {isPro
+                            ? autoApply
+                                ? `✓ Enabled — auto-applying to ${matchThreshold}%+ match jobs`
+                                : "Toggle on to automatically apply to matching jobs"
+                            : "Upgrade to Pro to apply to hundreds of jobs automatically"}
+                    </div>
+                </div>
 
-                        // Debug logging
-                        if (job.recruiterId && currentUserId) {
-                            console.log(`Job: ${job.title}, RecruiterId: ${job.recruiterId}, CurrentUserId: ${currentUserId}, Match: ${isOwnJob}`);
-                        }
+                {isPro ? (
+                    <button
+                        className={`jb-toggle ${autoApply ? "on" : ""}`}
+                        onClick={toggleAutoApply}
+                        disabled={updatingAA}
+                        title={autoApply ? "Disable Auto-Apply" : "Enable Auto-Apply"}
+                    />
+                ) : (
+                    <button
+                        className="jb-upgrade-btn"
+                        onClick={() => subscribe("PRO", 299)}
+                        disabled={subscribing}
+                    >
+                        <Crown size={12} style={{ display: "inline", marginRight: 5 }} />
+                        {subscribing ? "Processing…" : "Upgrade — ৳299/mo"}
+                    </button>
+                )}
+            </div>
+
+            {/* ── Search & Filter Bar ── */}
+            <div className="jb-bar">
+                <div className="jb-search-wrap">
+                    <Search size={16} className="jb-search-icon" />
+                    <input
+                        className="jb-search"
+                        placeholder="Search by title, company, skill, location…"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                    />
+                </div>
+                <button
+                    className={`jb-filter-btn ${typeFilter === "all" ? "active" : ""}`}
+                    onClick={() => setTypeFilter("all")}
+                >
+                    All
+                </button>
+                <button
+                    className={`jb-filter-btn ${typeFilter === "internal" ? "active" : ""}`}
+                    onClick={() => setTypeFilter("internal")}
+                >
+                    <Briefcase size={14} /> Platform Jobs
+                </button>
+                <button
+                    className={`jb-filter-btn ${typeFilter === "external" ? "active" : ""}`}
+                    onClick={() => setTypeFilter("external")}
+                >
+                    <ExternalLink size={14} /> External
+                </button>
+            </div>
+
+            {/* ── Count row ── */}
+            {jobs.length > 0 && (
+                <div className="jb-count-row">
+                    <p className="jb-count">
+                        Showing <span>{filtered.length}</span> of <span>{jobs.length}</span> jobs
+                    </p>
+                    {search && (
+                        <button
+                            onClick={() => setSearch("")}
+                            style={{
+                                fontSize: 12, color: "#003a9b", background: "none",
+                                border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif",
+                            }}
+                        >
+                            Clear search
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* ── Empty state ── */}
+            {filtered.length === 0 && (
+                <div className="jb-empty">
+                    <div className="jb-empty-icon">
+                        <Briefcase size={32} color="#94a3b8" />
+                    </div>
+                    <h3>{search || typeFilter !== "all" ? "No jobs match your filters" : "No jobs found yet"}</h3>
+                    <p>
+                        {search || typeFilter !== "all"
+                            ? "Try adjusting your search or clearing filters."
+                            : "Complete your profile with skills and experience so we can match you with jobs."}
+                    </p>
+                    {(search || typeFilter !== "all") && (
+                        <button
+                            onClick={() => { setSearch(""); setTypeFilter("all"); }}
+                            style={{
+                                marginTop: 8, padding: "9px 20px",
+                                background: "#003a9b", color: "#fff",
+                                border: "none", borderRadius: 10, fontSize: 13,
+                                fontWeight: 600, cursor: "pointer",
+                                fontFamily: "Inter, sans-serif",
+                            }}
+                        >
+                            Clear all filters
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* ── Job Cards Grid ── */}
+            {filtered.length > 0 && (
+                <div className="jb-grid">
+                    {filtered.map(job => {
+                        const isOwn     = job.recruiterId === currentUserId;
+                        const isExt     = job.isExternal;
+                        const accentCls = isOwn ? "own" : isExt ? "external" : "internal";
+                        const logoCls   = isOwn ? "own" : isExt ? "ext" : "";
+                        const company   = job.company || job.recruiter?.name || "TalentFlow";
 
                         return (
-                            <Card key={job.id} className="group hover:shadow-2xl transition-all duration-300 border-2 hover:border-primary/50 overflow-hidden flex flex-col">
-                                {/* Gradient Header */}
-                                <div className="h-2 bg-gradient-to-r from-primary via-purple-500 to-pink-500" />
+                            <div key={job.id} className="jb-card">
+                                {/* Accent stripe */}
+                                <div className={`jb-card-accent ${accentCls}`} />
 
-                                <CardContent className="p-6 flex-1 flex flex-col">
-                                    {/* Title */}
-                                    <div className="space-y-3 flex-1">
-                                        {/* Badges Row */}
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            {/* External Job Badge */}
-                                            {job.isExternal && (
-                                                <Badge variant="outline" className="w-fit bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300">
-                                                    <ExternalLink className="h-3 w-3 mr-1" />
-                                                    {job.source?.name || 'External Job'}
-                                                </Badge>
-                                            )}
-                                            {/* Your Job Post Badge */}
-                                            {isOwnJob && (
-                                                <Badge variant="secondary" className="w-fit bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300">
-                                                    <Briefcase className="h-3 w-3 mr-1" />
-                                                    Your Job Post
-                                                </Badge>
-                                            )}
+                                <div className="jb-card-body">
+                                    {/* Main info (left) */}
+                                    <div className="jb-main-info">
+                                        <div className={`jb-logo ${logoCls}`}>
+                                            {isOwn  ? <Briefcase size={22} color="#0891b2" /> :
+                                             isExt  ? <ExternalLink size={22} color="#7c3aed" /> :
+                                                      <Building2 size={22} color="#003a9b" />}
                                         </div>
-
-                                        <h3 className="text-xl font-bold line-clamp-2 group-hover:text-primary transition-colors">
-                                            {job.title}
-                                        </h3>
-
-                                        <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
-                                            {job.description}
-                                        </p>
-
-                                        {/* Job Details */}
-                                        <div className="flex flex-wrap gap-3 text-sm pt-2">
-                                            {job.location && (
-                                                <div className="flex items-center gap-1.5 text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
-                                                    <MapPin className="h-3.5 w-3.5" />
-                                                    <span className="font-medium">{job.location}</span>
+                                        <div className="jb-card-titles">
+                                            <div className="jb-job-title" title={job.title}>{job.title}</div>
+                                            <div className="jb-meta-row">
+                                                <div className="jb-company">
+                                                    {company}
                                                 </div>
-                                            )}
-                                            {job.salary && (
-                                                <div className="flex items-center gap-1.5 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full">
-                                                    <DollarSign className="h-3.5 w-3.5" />
-                                                    <span className="font-medium">{job.salary}</span>
+                                                <div className="jb-meta-dot">•</div>
+                                                <div className="jb-chips">
+                                                    {job.jobType && (
+                                                        <span className="jb-chip type">
+                                                            <Briefcase size={11} /> {job.jobType}
+                                                        </span>
+                                                    )}
+                                                    {job.workMode && (
+                                                        <span className="jb-chip mode">
+                                                            <MapPin size={11} /> {job.workMode}
+                                                        </span>
+                                                    )}
+                                                    {job.location && (
+                                                        <span className="jb-chip loc">
+                                                            <MapPin size={11} /> {job.location}
+                                                        </span>
+                                                    )}
+                                                    {job.salary && (
+                                                        <span className="jb-chip sal">
+                                                            <DollarSign size={11} /> {job.salary}
+                                                        </span>
+                                                    )}
+                                                    {isExt && (
+                                                        <span className="jb-chip ext">
+                                                            <ExternalLink size={11} /> {job.source?.name || "External"}
+                                                        </span>
+                                                    )}
+                                                    {isOwn && (
+                                                        <span className="jb-chip own">
+                                                            <Briefcase size={11} /> Your Post
+                                                        </span>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-
-                                        {/* Skills */}
-                                        <div className="flex flex-wrap gap-2">
-                                            {job.requirements.slice(0, 3).map((req, index) => (
-                                                <Badge key={index} variant="secondary" className="text-xs font-medium max-w-[200px] truncate block">
-                                                    {req}
-                                                </Badge>
-                                            ))}
-                                            {job.requirements.length > 3 && (
-                                                <Badge variant="secondary" className="text-xs">
-                                                    +{job.requirements.length - 3}
-                                                </Badge>
-                                            )}
-                                        </div>
-
-                                        {/* Date */}
-                                        <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
-                                            <Clock className="h-3 w-3" />
-                                            <span>Posted {new Date(job.createdAt).toLocaleDateString('en-US', {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric'
-                                            })}</span>
-                                            <span className="mx-1">•</span>
-                                            <span>{job.company || job.recruiter?.name}</span>
+                                            </div>
+                                            
+                                            {/* Skills */}
+                                            {job.requirements && job.requirements.length > 0 && (() => {
+                                                // Only show short tags, ignore full sentence paragraphs from scraped jobs
+                                                const shortSkills = job.requirements.filter(r => r.length <= 35);
+                                                if (shortSkills.length === 0) return null;
+                                                
+                                                return (
+                                                    <div className="jb-skills">
+                                                        {shortSkills.slice(0, 4).map((r, i) => (
+                                                            <span key={i} className="jb-skill" title={r}>{r}</span>
+                                                        ))}
+                                                        {shortSkills.length > 4 && (
+                                                            <span className="jb-skill" style={{ color: "#003a9b", border: "none", background: "transparent", paddingLeft: 0 }}>
+                                                                +{shortSkills.length - 4} more
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
 
-                                    {/* Action Button */}
-                                    <div className="pt-4">
-                                        {isOwnJob ? (
-                                            <div className="space-y-2">
-                                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                                                    <div className="flex items-center gap-3 mb-2">
-                                                        <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-full">
-                                                            <Briefcase className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-semibold text-blue-900 dark:text-blue-100">Your Job Post</p>
-                                                            <p className="text-xs text-blue-700 dark:text-blue-300">You posted this position</p>
-                                                        </div>
-                                                    </div>
-                                                    <Button
-                                                        variant="outline"
-                                                        className="w-full border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
-                                                        onClick={() => {
-                                                            setSelectedJobId(job.id);
-                                                            setShowSwitchDialog(true);
-                                                        }}
-                                                    >
-                                                        <Users className="h-4 w-4 mr-2" />
-                                                        View Applications
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ) : job.isExternal ? (
-                                            <Button
-                                                className="w-full shadow-md hover:shadow-lg transition-shadow bg-purple-600 hover:bg-purple-700"
+                                    {/* Actions (right) */}
+                                    <div className="jb-card-right">
+                                        <div className="jb-posted">
+                                            <Clock size={12} />
+                                            {timeAgo(job.createdAt)}
+                                        </div>
+
+                                        {isOwn ? (
+                                            <button
+                                                className="jb-apply-btn outline"
+                                                onClick={() => {
+                                                    setSelectedJobId(job.id);
+                                                    setShowSwitchDialog(true);
+                                                }}
+                                            >
+                                                <Users size={14} />
+                                                View Apps
+                                            </button>
+                                        ) : isExt ? (
+                                            <button
+                                                className="jb-apply-btn purple"
                                                 onClick={() => {
                                                     if (job.applicationMethod === "EMAIL" && job.applicationEmail) {
                                                         window.location.href = `mailto:${job.applicationEmail}`;
@@ -384,29 +649,26 @@ export default function FindJobsPage() {
                                                     }
                                                 }}
                                             >
-                                                <ExternalLink className="h-4 w-4 mr-2" />
-                                                Apply on Company Site
-                                            </Button>
+                                                <ExternalLink size={14} />
+                                                Apply
+                                            </button>
                                         ) : (
-                                            <Button
-                                                asChild
-                                                className="w-full shadow-md hover:shadow-lg transition-shadow"
-                                            >
-                                                <Link href={`/dashboard/job-seeker/jobs/${job.id}`}>
-                                                    <Zap className="h-4 w-4 mr-2 fill-current" />
+                                            <Link href={`/dashboard/job-seeker/jobs/${job.id}`} style={{ display: "contents" }}>
+                                                <button className="jb-apply-btn primary">
+                                                    <Zap size={14} />
                                                     View & Apply
-                                                </Link>
-                                            </Button>
+                                                </button>
+                                            </Link>
                                         )}
                                     </div>
-                                </CardContent>
-                            </Card>
-                        )
+                                </div>
+                            </div>
+                        );
                     })}
                 </div>
             )}
 
-            {/* Switch Role Dialog */}
+            {/* ── Switch Role Dialog ── */}
             <Dialog open={showSwitchDialog} onOpenChange={setShowSwitchDialog}>
                 <DialogContent>
                     <DialogHeader>
@@ -419,34 +681,23 @@ export default function FindJobsPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-                            <p className="text-sm text-blue-900 dark:text-blue-100">
-                                You'll be switched to Recruiter mode and redirected to the applications page for this job.
-                            </p>
+                        <div style={{
+                            background: "#eff6ff", border: "1px solid #bfdbfe",
+                            borderRadius: 10, padding: "14px 16px",
+                            fontSize: 14, color: "#1e40af", lineHeight: 1.6,
+                        }}>
+                            You&apos;ll be switched to Recruiter mode and redirected to the applications page for this job.
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowSwitchDialog(false)}
-                            disabled={switchingRole}
-                        >
+                        <Button variant="outline" onClick={() => setShowSwitchDialog(false)} disabled={switchingRole}>
                             Cancel
                         </Button>
-                        <Button
-                            onClick={handleSwitchToRecruiter}
-                            disabled={switchingRole}
-                        >
+                        <Button onClick={handleSwitchToRecruiter} disabled={switchingRole} style={{ background: "#003a9b" }}>
                             {switchingRole ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Switching...
-                                </>
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Switching…</>
                             ) : (
-                                <>
-                                    <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                    Switch & View Applications
-                                </>
+                                <><ArrowRightLeft className="mr-2 h-4 w-4" /> Switch &amp; View Applications</>
                             )}
                         </Button>
                     </DialogFooter>
