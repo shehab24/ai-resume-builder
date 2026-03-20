@@ -129,13 +129,13 @@ export function BasicInfoStep({ onNext, onBack }: BasicInfoStepProps) {
 
         <div className="space-y-2">
           <Label htmlFor="phone">Phone</Label>
-          <Input id="phone" {...register("phone")} placeholder="+1 234 567 890" />
+          <Input id="phone" {...register("phone")} placeholder="e.g. 01700000000" />
           {errors.phone && <p className="text-sm text-red-500">{errors.phone.message}</p>}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="location">Location</Label>
-          <Input id="location" {...register("location")} placeholder="New York, NY" />
+          <Input id="location" {...register("location")} placeholder="e.g. Dhaka, Bangladesh" />
           {errors.location && <p className="text-sm text-red-500">{errors.location.message}</p>}
         </div>
       </div>

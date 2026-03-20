@@ -13,7 +13,8 @@ export const experienceSchema = z.object({
   position: z.string().min(2, "Position is required"),
   company: z.string().min(2, "Company is required"),
   startDate: z.string().min(2, "Start date is required"),
-  endDate: z.string().min(2, "End date is required"),
+  endDate: z.string().optional(),
+  isCurrentlyWorking: z.boolean().optional(),
   description: z.string().min(10, "Description should be at least 10 characters"),
 });
 

@@ -50,7 +50,8 @@ export async function POST(req: Request) {
         The JSON must strictly follow this schema:
         {
           "personalInfo": {
-            "fullName": "string (use user's name if provided, otherwise: ${dbUser.name || user.firstName + " " + user.lastName})",
+            "fullName": "string (use user's name if provided, otherwise: ${dbUser.name || user.firstName + ' ' + user.lastName})",
+            "title": "string (professional job title)",
             "email": "string (use user's email if provided, otherwise: ${dbUser.email})",
             "phone": "string (extract from input or leave empty)",
             "linkedin": "string (extract from input or leave empty)",

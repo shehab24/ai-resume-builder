@@ -4,6 +4,7 @@ interface ResumeTemplateProps {
     data: {
         personalInfo?: {
             fullName?: string;
+            title?: string;
             email?: string;
             phone?: string;
             location?: string;
@@ -44,9 +45,14 @@ function ProfessionalTemplate({ data }: { data: ResumeTemplateProps['data'] }) {
         <div className="bg-white p-8 shadow-lg rounded-lg max-w-4xl mx-auto" style={{ minHeight: '842px' }}>
             {/* Header */}
             <div className="border-b-4 border-black pb-4 mb-6">
-                <h1 className="text-4xl font-bold text-black mb-2">
+                <h1 className="text-4xl font-bold text-black mb-1">
                     {data.personalInfo?.fullName || 'Your Name'}
                 </h1>
+                {data.personalInfo?.title && (
+                    <p className="text-xl font-medium text-gray-700 mb-2">
+                        {data.personalInfo.title}
+                    </p>
+                )}
                 <div className="text-sm text-gray-700 space-y-1">
                     {data.personalInfo?.email && <p>{data.personalInfo.email}</p>}
                     {data.personalInfo?.phone && <p>{data.personalInfo.phone}</p>}
@@ -131,9 +137,14 @@ function ModernTemplate({ data }: { data: ResumeTemplateProps['data'] }) {
         <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-8 shadow-lg rounded-lg max-w-4xl mx-auto" style={{ minHeight: '842px' }}>
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-lg mb-6">
-                <h1 className="text-4xl font-bold mb-2">
+                <h1 className="text-4xl font-bold mb-1">
                     {data.personalInfo?.fullName || 'Your Name'}
                 </h1>
+                {data.personalInfo?.title && (
+                    <p className="text-lg font-medium opacity-90 mb-2 uppercase tracking-wide">
+                        {data.personalInfo.title}
+                    </p>
+                )}
                 <div className="text-sm space-y-1 opacity-90">
                     {data.personalInfo?.email && <p>{data.personalInfo.email}</p>}
                     {data.personalInfo?.phone && <p>{data.personalInfo.phone}</p>}
@@ -230,9 +241,14 @@ function ClassicTemplate({ data }: { data: ResumeTemplateProps['data'] }) {
         <div className="bg-white p-8 shadow-lg rounded-lg max-w-4xl mx-auto border-2 border-gray-300" style={{ minHeight: '842px' }}>
             {/* Header */}
             <div className="text-center border-b-2 border-gray-400 pb-4 mb-6">
-                <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2">
+                <h1 className="text-3xl font-serif font-bold text-gray-900 mb-1 leading-tight">
                     {data.personalInfo?.fullName || 'Your Name'}
                 </h1>
+                {data.personalInfo?.title && (
+                    <p className="text-lg text-gray-700 mb-2">
+                        {data.personalInfo.title}
+                    </p>
+                )}
                 <div className="text-sm text-gray-600 space-x-3">
                     {data.personalInfo?.email && <span>{data.personalInfo.email}</span>}
                     {data.personalInfo?.phone && <span>• {data.personalInfo.phone}</span>}
@@ -275,7 +291,7 @@ function ClassicTemplate({ data }: { data: ResumeTemplateProps['data'] }) {
                                     <h3 className="text-base font-semibold text-gray-900">{exp.position}</h3>
                                     <span className="text-xs text-gray-600">{exp.startDate} - {exp.endDate}</span>
                                 </div>
-                                <p className="text-sm text-gray-700 italic mb-1">{exp.company}</p>
+                                <p className="text-sm text-gray-700 mb-1">{exp.company}</p>
                                 <p className="text-sm text-gray-800 leading-relaxed">{exp.description}</p>
                             </div>
                         ))}
@@ -311,7 +327,7 @@ function ClassicTemplate({ data }: { data: ResumeTemplateProps['data'] }) {
                                     <p className="text-sm text-gray-700 italic">{edu.school}</p>
                                 </div>
                             );
-                        })})
+                        })}
                     </div>
                 </div>
             )}

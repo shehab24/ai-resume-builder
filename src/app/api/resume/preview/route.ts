@@ -87,6 +87,7 @@ Please analyze this text and create a professional resume with the following JSO
 {
   "personalInfo": {
     "fullName": "Extract or infer the person's name (if not found, use 'Professional Candidate')",
+    "title": "Extract or infer professional job title (e.g. Senior Software Engineer)",
     "email": "Extract email if mentioned (if not found, use 'your.email@example.com')",
     "phone": "Extract phone if mentioned (optional)",
     "location": "Extract location if mentioned (optional)"
