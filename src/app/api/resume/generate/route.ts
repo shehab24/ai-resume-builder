@@ -50,7 +50,8 @@ export async function POST(req: Request) {
         The JSON must strictly follow this schema:
         {
           "personalInfo": {
-            "fullName": "string (use user's name if provided, otherwise: ${dbUser.name || user.firstName + " " + user.lastName})",
+            "fullName": "string (use user's name if provided, otherwise: ${dbUser.name || user.firstName + ' ' + user.lastName})",
+            "title": "string (professional job title)",
             "email": "string (use user's email if provided, otherwise: ${dbUser.email})",
             "phone": "string (extract from input or leave empty)",
             "linkedin": "string (extract from input or leave empty)",
@@ -71,7 +72,9 @@ export async function POST(req: Request) {
             {
               "degree": "string (e.g., Bachelor of Science in Computer Science)",
               "school": "string (institution name)",
-              "graduationDate": "string (YYYY format)"
+              "fieldOfStudy": "string (field of study)",
+              "startDate": "string (YYYY-MM-DD format)",
+              "endDate": "string (YYYY-MM-DD format, or 'present' if currently studying)"
             }
           ],
           "skills": ["string (categorized: technical skills, soft skills, tools, languages)"],
