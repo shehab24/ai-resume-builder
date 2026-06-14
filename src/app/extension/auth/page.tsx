@@ -87,7 +87,6 @@ export default function ExtensionAuthPage() {
                             routing="hash"
                             afterSignInUrl="/extension/auth"
                             appearance={{
-                                // @ts-expect-error – Clerks styling is complex
                                 elements: {
                                     rootBox: { width: "100%" },
                                     card: { boxShadow: "none", border: "1px solid #e2e8f0", borderRadius: 16 }
