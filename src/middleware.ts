@@ -14,6 +14,9 @@ const isPublicRoute = createRouteMatcher([
   '/api/ai/suggest-skills(.*)',
   '/payment(.*)',
   '/webhooks(.*)',
+  // Extension auth & API — auth is handled inside each route via auth()
+  '/extension(.*)',
+  '/api/extension(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
