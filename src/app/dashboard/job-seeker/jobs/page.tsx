@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,8 @@ import {
 import {
     Loader2, MapPin, DollarSign, Zap, Briefcase, ExternalLink,
     Clock, Crown, Users, ArrowRightLeft, Search, SlidersHorizontal,
-    Building2, Sparkles, ChevronRight, TrendingUp,
+    Building2, Sparkles, ChevronRight, TrendingUp, Bot, CheckCircle2,
+    XCircle, RefreshCw, Wifi, WifiOff, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -34,6 +35,15 @@ interface Job {
     recruiter: { name: string };
     recruiterId?: string;
     source?: { name: string };
+}
+
+interface QueueEntry {
+    id: string;
+    jobUrl: string;
+    status: string; // PENDING | PROCESSING | DONE | FAILED | SKIPPED
+    queuedAt: string;
+    processedAt?: string;
+    notes?: string;
 }
 
 /* ─────────────────────────────────────────────
@@ -246,6 +256,31 @@ const css = `
     @keyframes jb-spin { to { transform: rotate(360deg); } }
     .jb-loading p { font-size: 14px; color: #64748b; font-family: 'Inter', sans-serif; }
 
+    /* ── pagination ── */
+    .jb-pagination {
+        display: flex; justify-content: center; align-items: center; gap: 8px;
+        margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0;
+    }
+    .jb-page-btn {
+        display: flex; align-items: center; justify-content: center;
+        width: 36px; height: 36px; border-radius: 8px;
+        border: 1.5px solid #e2e8f0; font-size: 13px; font-weight: 600;
+        color: #475569; background: #fff; cursor: pointer;
+        transition: all 120ms; font-family: 'Inter', sans-serif;
+    }
+    .jb-page-btn:hover:not(:disabled) {
+        border-color: #003a9b; color: #003a9b; background: #eef2ff;
+    }
+    .jb-page-btn.active {
+        background: #003a9b; color: #fff; border-color: #003a9b;
+    }
+    .jb-page-btn:disabled {
+        opacity: 0.5; cursor: not-allowed;
+    }
+    .jb-page-arrow {
+        padding: 0 12px; width: auto;
+    }
+
     @media (max-width: 640px) {
         .jb-autoapply { flex-wrap: wrap; }
     }
@@ -279,6 +314,23 @@ export default function FindJobsPage() {
     const [currentUserId, setCurrentUserId]   = useState<string | null>(null);
     const [search, setSearch]     = useState("");
     const [typeFilter, setTypeFilter] = useState<"all" | "internal" | "external">("all");
+    const [mainTab, setMainTab] = useState<"matching" | "applied" | "failed">("matching");
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const jobsPerPage = 20;
+
+    // Extension queue state
+    const [extensionConnected, setExtensionConnected] = useState(false);
+    const [extensionInstalledLocal, setExtensionInstalledLocal] = useState(false);
+    const [extensionAuthenticated, setExtensionAuthenticated] = useState(false);
+    const [queueMap, setQueueMap] = useState<Record<string, QueueEntry>>({}); // jobUrl -> QueueEntry
+    const [queuingId, setQueuingId] = useState<string | null>(null);
+
+    // Bulk enqueuing state
+    const [bulkApplying, setBulkApplying]   = useState(false);
+    const [bulkDoneCount, setBulkDoneCount] = useState(0);
+    const [bulkTotalCount, setBulkTotalCount] = useState(0);
 
     // Switch role dialog
     const [showSwitchDialog, setShowSwitchDialog] = useState(false);
@@ -292,14 +344,47 @@ export default function FindJobsPage() {
             await fetchProfile();
             await fetchJobs();
             await fetchSubStatus();
+            await fetchQueue();
         })();
+    }, []);
+
+    useEffect(() => {
+        let active = true;
+        const handleMessage = (e: MessageEvent) => {
+            if (e.data?.type === "TALENTFLOW_PONG") {
+                setExtensionInstalledLocal(true);
+                setExtensionAuthenticated(!!e.data.authenticated);
+            }
+        };
+        window.addEventListener("message", handleMessage);
+
+        const ping = () => {
+            if (active) window.postMessage({ type: "TALENTFLOW_PING" }, "*");
+        };
+        ping();
+        const interval = setInterval(ping, 1500);
+
+        return () => {
+            active = false;
+            window.removeEventListener("message", handleMessage);
+            clearInterval(interval);
+        };
     }, []);
 
     // Live filter
     useEffect(() => {
         let out = jobs;
-        if (typeFilter === "internal") out = out.filter(j => !j.isExternal);
-        if (typeFilter === "external") out = out.filter(j => j.isExternal);
+        if (mainTab === "applied") {
+            // Jobs that are DONE in queue
+            const doneUrls = Object.values(queueMap).filter(q => q.status === "DONE").map(q => q.jobUrl);
+            out = out.filter(j => j.externalUrl && doneUrls.includes(j.externalUrl));
+        } else if (mainTab === "failed") {
+            const failedUrls = Object.values(queueMap).filter(q => q.status === "FAILED").map(q => q.jobUrl);
+            out = out.filter(j => j.externalUrl && failedUrls.includes(j.externalUrl));
+        } else {
+            if (typeFilter === "internal") out = out.filter(j => !j.isExternal);
+            if (typeFilter === "external") out = out.filter(j => j.isExternal);
+        }
         if (search.trim()) {
             const q = search.toLowerCase();
             out = out.filter(j =>
@@ -310,7 +395,18 @@ export default function FindJobsPage() {
             );
         }
         setFiltered(out);
-    }, [jobs, search, typeFilter]);
+    }, [jobs, search, typeFilter, mainTab, queueMap]);
+
+    // Only reset page back to 1 when search query, filter type, or main tab changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, typeFilter, mainTab]);
+
+    // Paginated slices
+    const indexOfLastJob = currentPage * jobsPerPage;
+    const indexOfFirstJob = indexOfLastJob - jobsPerPage;
+    const currentJobs = filtered.slice(indexOfFirstJob, indexOfLastJob);
+    const totalPages = Math.ceil(filtered.length / jobsPerPage);
 
     const fetchJobs = async () => {
         try {
@@ -321,6 +417,127 @@ export default function FindJobsPage() {
         finally { setLoading(false); }
     };
 
+    const fetchQueue = async () => {
+        try {
+            const res = await fetch("/api/extension/queue/history");
+            if (res.ok) {
+                const entries: QueueEntry[] = await res.json();
+                const map: Record<string, QueueEntry> = {};
+                entries.forEach(e => { map[e.jobUrl] = e; });
+                setQueueMap(map);
+            }
+        } catch { /* silent */ }
+    };
+
+    const queueJobForAutoApply = async (job: Job) => {
+        if (!extensionInstalledLocal) {
+            toast.error("Please load and enable the TalentFlow Extension in this browser first!");
+            return;
+        }
+        if (!extensionAuthenticated) {
+            toast.error("Please link your TalentFlow account inside the Chrome Extension first!");
+            return;
+        }
+
+        const url = job.externalUrl || "";
+        if (!url) { toast.error("No external URL for this job"); return; }
+
+        setQueuingId(job.id);
+        try {
+            const res = await fetch("/api/extension/queue", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    jobId: job.id,
+                    jobTitle: job.title,
+                    company: job.company || job.recruiter?.name,
+                    jobUrl: url,
+                    platform: job.source?.name?.toLowerCase() || detectPlatform(url),
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                if (res.status === 409) {
+                    toast.info("Already in queue — extension will apply soon!");
+                } else {
+                    toast.error(data.error || "Failed to queue job");
+                }
+                return;
+            }
+            // Optimistically update queue map
+            setQueueMap(prev => ({ ...prev, [url]: data }));
+            toast.success("Queued! Extension will auto-apply shortly ⚡");
+        } catch {
+            toast.error("Failed to queue job");
+        } finally {
+            setQueuingId(null);
+        }
+    };
+
+    const startBulkAutoApply = async () => {
+        // Find matching external jobs that are not already enqueued (PENDING, PROCESSING, or DONE)
+        const toQueue = filtered.filter(job => {
+            if (!job.isExternal || !job.externalUrl) return false;
+            const entry = queueMap[job.externalUrl];
+            return !entry || (entry.status !== "PENDING" && entry.status !== "PROCESSING" && entry.status !== "DONE");
+        });
+
+        if (toQueue.length === 0) {
+            toast.info("No new external jobs to apply to in the current search.");
+            return;
+        }
+
+        // Apply a safe cap of 15 jobs at once (user requested 10-20 or 5-10)
+        const targetJobs = toQueue.slice(0, 15);
+        
+        setBulkApplying(true);
+        setBulkTotalCount(targetJobs.length);
+        setBulkDoneCount(0);
+
+        toast.success(`Starting bulk auto-apply for ${targetJobs.length} jobs... 🚀`);
+
+        let successCount = 0;
+        for (let i = 0; i < targetJobs.length; i++) {
+            const job = targetJobs[i];
+            const url = job.externalUrl || "";
+
+            try {
+                const res = await fetch("/api/extension/queue", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        jobId: job.id,
+                        jobTitle: job.title,
+                        company: job.company || job.recruiter?.name,
+                        jobUrl: url,
+                        platform: job.source?.name?.toLowerCase() || detectPlatform(url),
+                    }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    setQueueMap(prev => ({ ...prev, [url]: data }));
+                    successCount++;
+                }
+            } catch (err) {
+                console.error("Bulk queue error for job:", job.title, err);
+            }
+            setBulkDoneCount(i + 1);
+            // Add a tiny delay between requests so we don't spam the server
+            await new Promise(r => setTimeout(r, 200));
+        }
+
+        setBulkApplying(false);
+        toast.success(`Successfully queued ${successCount} jobs! Extension is now auto-applying in the background ⚡`);
+    };
+
+    function detectPlatform(url: string) {
+        if (url.includes("linkedin")) return "linkedin";
+        if (url.includes("indeed")) return "indeed";
+        if (url.includes("glassdoor")) return "glassdoor";
+        if (url.includes("bdjobs")) return "bdjobs";
+        return "other";
+    }
+
     const fetchProfile = async () => {
         try {
             const res = await fetch("/api/user/profile");
@@ -329,6 +546,7 @@ export default function FindJobsPage() {
                 setAutoApply(d.autoApply || false);
                 setMatchThreshold(d.matchThreshold || 95);
                 setCurrentUserId(d.id);
+                setExtensionConnected(!!d.extensionToken && !!d.extensionConnectedAt);
             }
         } catch { /* silent */ }
     };
@@ -406,6 +624,58 @@ export default function FindJobsPage() {
                         ? `${jobs.length} jobs matched to your profile · sorted by best fit`
                         : "No matched jobs yet — complete your profile to unlock matches"}
                 </p>
+            </div>
+
+            {/* ── Main Tabs (like OptimHire) ── */}
+            <div style={{
+                display: "flex", gap: 0, marginBottom: 20,
+                borderBottom: "2px solid #f1f5f9",
+            }}>
+                {([
+                    { key: "matching", label: "Matching Jobs", count: jobs.filter(j => mainTab !== "matching" || true).length },
+                    { key: "applied", label: "Applied", count: Object.values(queueMap).filter(q => q.status === "DONE").length },
+                    { key: "failed", label: "Failed", count: Object.values(queueMap).filter(q => q.status === "FAILED").length },
+                ] as const).map(tab => (
+                    <button
+                        key={tab.key}
+                        onClick={() => setMainTab(tab.key)}
+                        style={{
+                            padding: "10px 20px", border: "none", background: "transparent",
+                            fontFamily: "Inter, sans-serif", fontSize: 14, fontWeight: 600,
+                            cursor: "pointer", color: mainTab === tab.key ? "#003a9b" : "#64748b",
+                            borderBottom: mainTab === tab.key ? "2px solid #003a9b" : "2px solid transparent",
+                            marginBottom: -2, transition: "all 150ms",
+                            display: "flex", alignItems: "center", gap: 6,
+                        }}
+                    >
+                        {tab.label}
+                        {tab.count > 0 && (
+                            <span style={{
+                                padding: "1px 7px", borderRadius: 999,
+                                background: mainTab === tab.key ? "#003a9b" : "#f1f5f9",
+                                color: mainTab === tab.key ? "#fff" : "#64748b",
+                                fontSize: 11, fontWeight: 700,
+                            }}>{tab.count}</span>
+                        )}
+                    </button>
+                ))}
+
+                {/* Extension status pill */}
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, paddingBottom: 2 }}>
+                    {extensionInstalledLocal && extensionAuthenticated ? (
+                        <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#16a34a", fontWeight: 600 }}>
+                            <Wifi size={13} /> Extension Active
+                        </span>
+                    ) : extensionInstalledLocal ? (
+                        <a href="/dashboard/job-seeker/auto-apply" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#d97706", fontWeight: 600, textDecoration: "none" }}>
+                            <AlertCircle size={13} /> Link Extension
+                        </a>
+                    ) : (
+                        <a href="/dashboard/job-seeker/auto-apply" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#64748b", fontWeight: 600, textDecoration: "none" }}>
+                            <WifiOff size={13} /> Install Extension
+                        </a>
+                    )}
+                </div>
             </div>
 
             {/* ── Auto-Apply Banner ── */}
@@ -487,21 +757,48 @@ export default function FindJobsPage() {
 
             {/* ── Count row ── */}
             {jobs.length > 0 && (
-                <div className="jb-count-row">
+                <div className="jb-count-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <p className="jb-count">
                         Showing <span>{filtered.length}</span> of <span>{jobs.length}</span> jobs
                     </p>
-                    {search && (
-                        <button
-                            onClick={() => setSearch("")}
-                            style={{
-                                fontSize: 12, color: "#003a9b", background: "none",
-                                border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif",
-                            }}
-                        >
-                            Clear search
-                        </button>
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        {mainTab === "matching" && filtered.filter(j => j.isExternal).length > 0 && (
+                            <button
+                                onClick={() => startBulkAutoApply()}
+                                disabled={!extensionInstalledLocal || !extensionAuthenticated || bulkApplying}
+                                className="jb-apply-btn purple"
+                                style={{
+                                    minWidth: 0,
+                                    padding: "6px 14px",
+                                    fontSize: "12px",
+                                    height: "32px",
+                                    borderRadius: "8px",
+                                    fontWeight: "600",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                }}
+                                title={!extensionInstalledLocal ? "Load/Enable extension first" : !extensionAuthenticated ? "Link extension to your account first" : "Bulk apply to matching external jobs"}
+                            >
+                                {bulkApplying ? (
+                                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Queuing ({bulkDoneCount}/{bulkTotalCount})</>
+                                ) : (
+                                    <><Bot className="h-4 w-4" /> Bulk Auto-Apply ({filtered.filter(j => j.isExternal).length})</>
+                                )}
+                            </button>
+                        )}
+                        {search && (
+                            <button
+                                onClick={() => setSearch("")}
+                                style={{
+                                    fontSize: 12, color: "#003a9b", background: "none",
+                                    border: "none", cursor: "pointer", fontFamily: "Inter, sans-serif",
+                                }}
+                            >
+                                Clear search
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -535,137 +832,219 @@ export default function FindJobsPage() {
             )}
 
             {/* ── Job Cards Grid ── */}
-            {filtered.length > 0 && (
-                <div className="jb-grid">
-                    {filtered.map(job => {
-                        const isOwn     = job.recruiterId === currentUserId;
-                        const isExt     = job.isExternal;
-                        const accentCls = isOwn ? "own" : isExt ? "external" : "internal";
-                        const logoCls   = isOwn ? "own" : isExt ? "ext" : "";
-                        const company   = job.company || job.recruiter?.name || "TalentFlow";
+            {currentJobs.length > 0 && (
+                <>
+                    <div className="jb-grid">
+                        {currentJobs.map(job => {
+                            const isOwn     = job.recruiterId === currentUserId;
+                            const isExt     = job.isExternal;
+                            const accentCls = isOwn ? "own" : isExt ? "external" : "internal";
+                            const logoCls   = isOwn ? "own" : isExt ? "ext" : "";
+                            const company   = job.company || job.recruiter?.name || "TalentFlow";
 
-                        return (
-                            <div key={job.id} className="jb-card">
-                                {/* Accent stripe */}
-                                <div className={`jb-card-accent ${accentCls}`} />
+                            return (
+                                <div key={job.id} className="jb-card">
+                                    {/* Accent stripe */}
+                                    <div className={`jb-card-accent ${accentCls}`} />
 
-                                <div className="jb-card-body">
-                                    {/* Main info (left) */}
-                                    <div className="jb-main-info">
-                                        <div className={`jb-logo ${logoCls}`}>
-                                            {isOwn  ? <Briefcase size={22} color="#0891b2" /> :
-                                             isExt  ? <ExternalLink size={22} color="#7c3aed" /> :
-                                                      <Building2 size={22} color="#003a9b" />}
-                                        </div>
-                                        <div className="jb-card-titles">
-                                            <div className="jb-job-title" title={job.title}>{job.title}</div>
-                                            <div className="jb-meta-row">
-                                                <div className="jb-company">
-                                                    {company}
-                                                </div>
-                                                <div className="jb-meta-dot">•</div>
-                                                <div className="jb-chips">
-                                                    {job.jobType && (
-                                                        <span className="jb-chip type">
-                                                            <Briefcase size={11} /> {job.jobType}
-                                                        </span>
-                                                    )}
-                                                    {job.workMode && (
-                                                        <span className="jb-chip mode">
-                                                            <MapPin size={11} /> {job.workMode}
-                                                        </span>
-                                                    )}
-                                                    {job.location && (
-                                                        <span className="jb-chip loc">
-                                                            <MapPin size={11} /> {job.location}
-                                                        </span>
-                                                    )}
-                                                    {job.salary && (
-                                                        <span className="jb-chip sal">
-                                                            <DollarSign size={11} /> {job.salary}
-                                                        </span>
-                                                    )}
-                                                    {isExt && (
-                                                        <span className="jb-chip ext">
-                                                            <ExternalLink size={11} /> {job.source?.name || "External"}
-                                                        </span>
-                                                    )}
-                                                    {isOwn && (
-                                                        <span className="jb-chip own">
-                                                            <Briefcase size={11} /> Your Post
-                                                        </span>
-                                                    )}
-                                                </div>
+                                    <div className="jb-card-body">
+                                        {/* Main info (left) */}
+                                        <div className="jb-main-info">
+                                            <div className={`jb-logo ${logoCls}`}>
+                                                {isOwn  ? <Briefcase size={22} color="#0891b2" /> :
+                                                 isExt  ? <ExternalLink size={22} color="#7c3aed" /> :
+                                                          <Building2 size={22} color="#003a9b" />}
                                             </div>
-                                            
-                                            {/* Skills */}
-                                            {job.requirements && job.requirements.length > 0 && (() => {
-                                                // Only show short tags, ignore full sentence paragraphs from scraped jobs
-                                                const shortSkills = job.requirements.filter(r => r.length <= 35);
-                                                if (shortSkills.length === 0) return null;
-                                                
-                                                return (
-                                                    <div className="jb-skills">
-                                                        {shortSkills.slice(0, 4).map((r, i) => (
-                                                            <span key={i} className="jb-skill" title={r}>{r}</span>
-                                                        ))}
-                                                        {shortSkills.length > 4 && (
-                                                            <span className="jb-skill" style={{ color: "#003a9b", border: "none", background: "transparent", paddingLeft: 0 }}>
-                                                                +{shortSkills.length - 4} more
+                                            <div className="jb-card-titles">
+                                                <div className="jb-job-title" title={job.title}>{job.title}</div>
+                                                <div className="jb-meta-row">
+                                                    <div className="jb-company">
+                                                        {company}
+                                                    </div>
+                                                    <div className="jb-meta-dot">•</div>
+                                                    <div className="jb-chips">
+                                                        {job.jobType && (
+                                                            <span className="jb-chip type">
+                                                                <Briefcase size={11} /> {job.jobType}
+                                                            </span>
+                                                        )}
+                                                        {job.workMode && (
+                                                            <span className="jb-chip mode">
+                                                                <MapPin size={11} /> {job.workMode}
+                                                            </span>
+                                                        )}
+                                                        {job.location && (
+                                                            <span className="jb-chip loc">
+                                                                <MapPin size={11} /> {job.location}
+                                                            </span>
+                                                        )}
+                                                        {job.salary && (
+                                                            <span className="jb-chip sal">
+                                                                <DollarSign size={11} /> {job.salary}
+                                                            </span>
+                                                        )}
+                                                        {isExt && (
+                                                            <span className="jb-chip ext">
+                                                                <ExternalLink size={11} /> {job.source?.name || "External"}
+                                                            </span>
+                                                        )}
+                                                        {isOwn && (
+                                                            <span className="jb-chip own">
+                                                                <Briefcase size={11} /> Your Post
                                                             </span>
                                                         )}
                                                     </div>
-                                                );
-                                            })()}
+                                                </div>
+                                                
+                                                {/* Skills */}
+                                                {job.requirements && job.requirements.length > 0 && (() => {
+                                                    // Only show short tags, ignore full sentence paragraphs from scraped jobs
+                                                    const shortSkills = job.requirements.filter(r => r.length <= 35);
+                                                    if (shortSkills.length === 0) return null;
+                                                    
+                                                    return (
+                                                        <div className="jb-skills">
+                                                            {shortSkills.slice(0, 4).map((r, i) => (
+                                                                <span key={i} className="jb-skill" title={r}>{r}</span>
+                                                            ))}
+                                                            {shortSkills.length > 4 && (
+                                                                <span className="jb-skill" style={{ color: "#003a9b", border: "none", background: "transparent", paddingLeft: 0 }}>
+                                                                    +{shortSkills.length - 4} more
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Actions (right) */}
-                                    <div className="jb-card-right">
-                                        <div className="jb-posted">
-                                            <Clock size={12} />
-                                            {timeAgo(job.createdAt)}
-                                        </div>
+                                        {/* Actions (right) */}
+                                        <div className="jb-card-right">
+                                            <div className="jb-posted">
+                                                <Clock size={12} />
+                                                {timeAgo(job.createdAt)}
+                                            </div>
 
-                                        {isOwn ? (
-                                            <button
-                                                className="jb-apply-btn outline"
-                                                onClick={() => {
-                                                    setSelectedJobId(job.id);
-                                                    setShowSwitchDialog(true);
-                                                }}
-                                            >
-                                                <Users size={14} />
-                                                View Apps
-                                            </button>
-                                        ) : isExt ? (
-                                            <button
-                                                className="jb-apply-btn purple"
-                                                onClick={() => {
-                                                    if (job.applicationMethod === "EMAIL" && job.applicationEmail) {
-                                                        window.location.href = `mailto:${job.applicationEmail}`;
-                                                    } else if (job.externalUrl) {
-                                                        window.open(job.externalUrl, "_blank");
-                                                    }
-                                                }}
-                                            >
-                                                <ExternalLink size={14} />
-                                                Apply
-                                            </button>
-                                        ) : (
-                                            <Link href={`/dashboard/job-seeker/jobs/${job.id}`} style={{ display: "contents" }}>
-                                                <button className="jb-apply-btn primary">
-                                                    <Zap size={14} />
-                                                    View & Apply
+                                            {isOwn ? (
+                                                <button
+                                                    className="jb-apply-btn outline"
+                                                    onClick={() => {
+                                                        setSelectedJobId(job.id);
+                                                        setShowSwitchDialog(true);
+                                                    }}
+                                                >
+                                                    <Users size={14} />
+                                                    View Apps
                                                 </button>
-                                            </Link>
-                                        )}
+                                            ) : isExt ? (() => {
+                                                // Bot auto-apply button for external jobs
+                                                const url = job.externalUrl || "";
+                                                const qEntry = queueMap[url];
+                                                const isQueuing = queuingId === job.id;
+
+                                                if (qEntry?.status === "DONE") return (
+                                                    <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#16a34a" }}>
+                                                        <CheckCircle2 size={15} /> Applied
+                                                    </span>
+                                                );
+                                                if (qEntry?.status === "FAILED") {
+                                                    const isNotEasyApply = qEntry.notes?.includes("No Easy Apply") || qEntry.notes?.includes("No Apply button");
+                                                    return (
+                                                        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                                                            <span 
+                                                                style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: isNotEasyApply ? "#d97706" : "#dc2626" }}
+                                                                title={qEntry.notes || ""}
+                                                            >
+                                                                {isNotEasyApply ? <AlertCircle size={13} /> : <XCircle size={13} />}
+                                                                {isNotEasyApply ? "Manual Apply" : "Failed"}
+                                                            </span>
+                                                            {isNotEasyApply ? (
+                                                                <a
+                                                                    href={job.externalUrl || ""}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="jb-apply-btn primary"
+                                                                    style={{ minWidth: 0, padding: "6px 12px", fontSize: 11, textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
+                                                                >
+                                                                    <ExternalLink size={12} /> Apply Now
+                                                                </a>
+                                                            ) : (
+                                                                <button
+                                                                    className="jb-apply-btn purple"
+                                                                    style={{ minWidth: 0, padding: "6px 12px", fontSize: 11 }}
+                                                                    onClick={() => queueJobForAutoApply(job)}
+                                                                >
+                                                                    <RefreshCw size={12} /> Retry
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                }
+                                                if (qEntry?.status === "PROCESSING" || qEntry?.status === "PENDING") return (
+                                                    <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: "#003a9b" }}>
+                                                        <Loader2 size={14} className="animate-spin" />
+                                                        {qEntry.status === "PROCESSING" ? "Applying…" : "Queued"}
+                                                    </span>
+                                                );
+
+                                                return (
+                                                    <button
+                                                        className="jb-apply-btn purple"
+                                                        disabled={isQueuing || !extensionInstalledLocal || !extensionAuthenticated}
+                                                        title={!extensionInstalledLocal ? "Install Chrome Extension first" : !extensionAuthenticated ? "Link Chrome Extension first" : "Auto-apply via extension bot"}
+                                                        onClick={() => (extensionInstalledLocal && extensionAuthenticated) ? queueJobForAutoApply(job) : (window.location.href = "/dashboard/job-seeker/auto-apply")}
+                                                    >
+                                                        {isQueuing ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
+                                                        {!extensionInstalledLocal ? "Install Ext." : !extensionAuthenticated ? "Link Ext." : isQueuing ? "Queuing…" : "Auto Apply"}
+                                                    </button>
+                                                );
+                                            })() : (
+                                                <Link href={`/dashboard/job-seeker/jobs/${job.id}`} style={{ display: "contents" }}>
+                                                    <button className="jb-apply-btn primary">
+                                                        <Zap size={14} />
+                                                        View &amp; Apply
+                                                    </button>
+                                                </Link>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="jb-pagination">
+                            <button
+                                className="jb-page-btn jb-page-arrow"
+                                onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                                disabled={currentPage === 1}
+                            >
+                                Previous
+                            </button>
+                            {Array.from({ length: totalPages }).map((_, i) => {
+                                const pageNum = i + 1;
+                                return (
+                                    <button
+                                        key={pageNum}
+                                        className={`jb-page-btn ${currentPage === pageNum ? "active" : ""}`}
+                                        onClick={() => setCurrentPage(pageNum)}
+                                    >
+                                        {pageNum}
+                                    </button>
+                                );
+                            })}
+                            <button
+                                className="jb-page-btn jb-page-arrow"
+                                onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                                disabled={currentPage === totalPages}
+                            >
+                                Next
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* ── Switch Role Dialog ── */}
