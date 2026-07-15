@@ -21,6 +21,7 @@ export default function AdminEditJobPage() {
         company: "",
         description: "",
         location: "",
+        country: "",
         jobType: "FULL_TIME",
         workMode: "ON_SITE",
         experienceLevel: "MID",
@@ -30,6 +31,10 @@ export default function AdminEditJobPage() {
         benefits: "",
         applicationDeadline: "",
         tasks: "",
+        isExternal: false,
+        externalUrl: "",
+        applicationMethod: "INTERNAL",
+        applicationEmail: "",
     });
 
     useEffect(() => {
@@ -46,6 +51,7 @@ export default function AdminEditJobPage() {
                     company: job.company || "",
                     description: job.description || "",
                     location: job.location || "",
+                    country: job.country || "",
                     jobType: job.jobType || "FULL_TIME",
                     workMode: job.workMode || "ON_SITE",
                     experienceLevel: job.experienceLevel || "MID",
@@ -55,6 +61,10 @@ export default function AdminEditJobPage() {
                     benefits: job.benefits?.join(", ") || "",
                     applicationDeadline: job.applicationDeadline ? new Date(job.applicationDeadline).toISOString().split('T')[0] : "",
                     tasks: job.tasks?.join(", ") || "",
+                    isExternal: !!job.isExternal,
+                    externalUrl: job.externalUrl || "",
+                    applicationMethod: job.applicationMethod || "INTERNAL",
+                    applicationEmail: job.applicationEmail || "",
                 });
             } catch (error) {
                 console.error(error);
@@ -198,7 +208,7 @@ export default function AdminEditJobPage() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="location">Location</Label>
                                 <Input
@@ -206,6 +216,16 @@ export default function AdminEditJobPage() {
                                     value={formData.location}
                                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                                     placeholder="e.g., San Francisco, CA"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="country">Country</Label>
+                                <Input
+                                    id="country"
+                                    value={formData.country}
+                                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                                    placeholder="e.g., United States"
                                 />
                             </div>
 
@@ -275,6 +295,76 @@ export default function AdminEditJobPage() {
                                 placeholder="Complete coding challenge, Submit portfolio"
                                 rows={3}
                             />
+                        </div>
+
+                        {/* ── Application & Extension Settings ── */}
+                        <div className="border-t pt-6 space-y-4">
+                            <h3 className="font-semibold text-lg text-slate-800">Application &amp; Auto-Apply Settings</h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="applicationMethod">Application Method</Label>
+                                    <Select 
+                                        value={formData.applicationMethod} 
+                                        onValueChange={(value) => setFormData({ 
+                                            ...formData, 
+                                            applicationMethod: value,
+                                            // Auto-tick isExternal if external link is chosen
+                                            isExternal: value === "EXTERNAL_LINK" ? true : formData.isExternal
+                                        })}
+                                    >
+                                        <SelectTrigger id="applicationMethod">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="INTERNAL">Internal TalentFlow Apply</SelectItem>
+                                            <SelectItem value="EXTERNAL_LINK">External Apply URL</SelectItem>
+                                            <SelectItem value="EMAIL">Email Application</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="flex items-center space-x-2 pt-8">
+                                    <input
+                                        type="checkbox"
+                                        id="isExternal"
+                                        checked={formData.isExternal}
+                                        onChange={(e) => setFormData({ ...formData, isExternal: e.target.checked })}
+                                        className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                                    />
+                                    <Label htmlFor="isExternal" className="cursor-pointer font-medium">
+                                        Is External Job (Requires Chrome Extension Auto-Apply)
+                                    </Label>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="externalUrl">
+                                    Job URL / External Application Link 
+                                    {(formData.applicationMethod === "EXTERNAL_LINK" || formData.isExternal) ? " *" : " (Optional)"}
+                                </Label>
+                                <Input
+                                    id="externalUrl"
+                                    value={formData.externalUrl}
+                                    onChange={(e) => setFormData({ ...formData, externalUrl: e.target.value })}
+                                    placeholder="https://example.com/careers/apply"
+                                    required={formData.applicationMethod === "EXTERNAL_LINK" || formData.isExternal}
+                                />
+                            </div>
+
+                            {formData.applicationMethod === "EMAIL" && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="applicationEmail">Application Email Address *</Label>
+                                    <Input
+                                        id="applicationEmail"
+                                        type="email"
+                                        value={formData.applicationEmail}
+                                        onChange={(e) => setFormData({ ...formData, applicationEmail: e.target.value })}
+                                        placeholder="jobs@company.com"
+                                        required
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex gap-4">

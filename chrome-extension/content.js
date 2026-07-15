@@ -297,24 +297,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const token = message.token;
   const site  = detectSite();
 
-  if (!site) {
-    sendResponse({ success: false, error: "Not a supported job site." });
-    return true;
-  }
-
   // Fetch profile then apply
   fetch(`${APP_BASE}/api/extension/profile`, {
     headers: { Authorization: `Bearer ${token}` }
   })
-  .then(r => r.json())
+  .then(r => {
+    if (r.status === 401 || r.status === 403) {
+      chrome.runtime.sendMessage({ type: "TALENTFLOW_LOGOUT" }).catch(() => {});
+      throw new Error("Token expired or invalid. Please link your account again.");
+    }
+    return r.json();
+  })
   .then(async (profile) => {
     if (profile.error) throw new Error(profile.error);
 
     let result;
     if (site === "linkedin")  result = await applyLinkedIn(profile);
-    if (site === "indeed")    result = await applyIndeed(profile);
-    if (site === "glassdoor") result = await applyGlassdoor(profile);
-    if (site === "bdjobs")    result = await applyBdjobs(profile);
+    else if (site === "indeed")    result = await applyIndeed(profile);
+    else if (site === "glassdoor") result = await applyGlassdoor(profile);
+    else if (site === "bdjobs")    result = await applyBdjobs(profile);
+    else {
+      result = await applyGeneric(profile);
+    }
 
     // If an external apply redirection is detected
     if (result && result.redirectUrl) {
@@ -337,10 +341,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     await fetch(`${APP_BASE}/api/extension/log`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ jobTitle, company, jobUrl: window.location.href, platform: site, status: "APPLIED" })
+      body: JSON.stringify({
+        jobTitle: jobTitle || document.title,
+        company: company || window.location.hostname,
+        jobUrl: window.location.href,
+        platform: site || "external",
+        status: (result && result.submitted) ? "APPLIED" : "MANUAL_SUBMIT_REQUIRED",
+        notes: result ? `Auto-filled ${result.fieldsFilled || 0} fields. ${result.submitted ? "Submitted form." : "Manual submission required."}` : ""
+      })
     });
 
-    sendResponse({ success: true, jobTitle, company });
+    sendResponse({ success: true, jobTitle: jobTitle || document.title, company: company || window.location.hostname });
   })
   .catch(err => {
     console.error("[TalentFlow] Auto-apply failed:", err);
@@ -348,7 +359,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     fetch(`${APP_BASE}/api/extension/log`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ jobTitle: document.title, jobUrl: window.location.href, platform: site, status: "FAILED", notes: err.message })
+      body: JSON.stringify({ jobTitle: document.title, jobUrl: window.location.href, platform: site || "external", status: "FAILED", notes: err.message })
     }).catch(() => {});
 
     sendResponse({ success: false, error: err.message });
@@ -431,7 +442,80 @@ if (window.location.pathname.startsWith("/extension/auth")) {
 
 // ── Generic Auto-Filler for external sites ────────────────────────────────────
 async function applyGeneric(profile) {
-  const textInputs = Array.from(document.querySelectorAll("input[type='text'], input[type='email'], input[type='tel'], textarea"));
+  const delay = (ms) => new Promise(r => setTimeout(r, ms));
+  
+  function fillFieldDirect(el, value) {
+    if (!el || !value) return false;
+    try {
+      const proto = el.tagName === "TEXTAREA" ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+      const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+      if (setter) {
+        setter.call(el, value);
+      } else {
+        el.value = value;
+      }
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    } catch (e) {
+      console.error("Direct fill failed, falling back:", e);
+      el.value = value;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    }
+  }
+
+  function fillSelect(select, value) {
+    if (!select || !value) return false;
+    const valLower = String(value).toLowerCase();
+    let bestOption = null;
+    for (const option of select.options) {
+      const optVal = option.value.toLowerCase();
+      const optText = option.textContent.toLowerCase();
+      if (optVal === valLower || optText === valLower) {
+        bestOption = option;
+        break;
+      }
+      if (optVal.includes(valLower) || optText.includes(valLower)) {
+        bestOption = option;
+      }
+    }
+    if (bestOption) {
+      select.value = bestOption.value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    }
+    return false;
+  }
+
+  function fillBooleanInput(input, labelText) {
+    const labelLower = labelText.toLowerCase();
+    if (labelLower.includes("authorized") || labelLower.includes("eligible") || labelLower.includes("permit") || labelLower.includes("sponsor")) {
+      if (input.type === "radio") {
+        const val = input.value.toLowerCase();
+        if (val === "yes" || val === "1" || val === "true") {
+          input.click();
+          return true;
+        }
+      } else if (input.type === "checkbox") {
+        if (!input.checked) {
+          input.click();
+          return true;
+        }
+      }
+    }
+    if (labelLower.includes("terms") || labelLower.includes("consent") || labelLower.includes("privacy") || labelLower.includes("agree") || labelLower.includes("policy")) {
+      if (input.type === "checkbox" && !input.checked) {
+        input.click();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // 1. Fill text inputs and textareas based on labels, placeholders, name, etc.
+  const textInputs = Array.from(document.querySelectorAll("input[type='text'], input[type='email'], input[type='tel'], input[type='url'], input[type='number'], textarea"));
   let fieldsFilled = 0;
 
   for (const input of textInputs) {
@@ -446,29 +530,76 @@ async function applyGeneric(profile) {
     })().toLowerCase();
 
     if (labelText.includes("first name")) {
-      if (fillField(`#${input.id}` || `input[name="${input.name}"]`, profile.name?.split(" ")[0])) fieldsFilled++;
+      if (fillFieldDirect(input, profile.name?.split(" ")[0])) fieldsFilled++;
     } else if (labelText.includes("last name")) {
-      if (fillField(`#${input.id}` || `input[name="${input.name}"]`, profile.name?.split(" ").slice(1).join(" ") || "")) fieldsFilled++;
+      if (fillFieldDirect(input, profile.name?.split(" ").slice(1).join(" ") || "")) fieldsFilled++;
     } else if (labelText.includes("name") || labelText.includes("fullname") || labelText.includes("full name")) {
-      if (fillField(`#${input.id}` || `input[name="${input.name}"]`, profile.name)) fieldsFilled++;
+      if (fillFieldDirect(input, profile.name)) fieldsFilled++;
     } else if (labelText.includes("email") || labelText.includes("mail")) {
-      if (fillField(`#${input.id}` || `input[name="${input.name}"]`, profile.email)) fieldsFilled++;
+      if (fillFieldDirect(input, profile.email)) fieldsFilled++;
     } else if (labelText.includes("phone") || labelText.includes("mobile") || labelText.includes("tel") || labelText.includes("contact")) {
-      if (fillField(`#${input.id}` || `input[name="${input.name}"]`, profile.phone)) fieldsFilled++;
+      if (fillFieldDirect(input, profile.phone)) fieldsFilled++;
     } else if (labelText.includes("linkedin") || labelText.includes("profile url")) {
-      if (fillField(`#${input.id}` || `input[name="${input.name}"]`, profile.linkedinUrl)) fieldsFilled++;
+      if (fillFieldDirect(input, profile.linkedinUrl || profile.linkedinProfileUrl)) fieldsFilled++;
     } else if (labelText.includes("portfolio") || labelText.includes("website") || labelText.includes("github")) {
-      if (fillField(`#${input.id}` || `input[name="${input.name}"]`, profile.portfolioUrl)) fieldsFilled++;
-    } else if (labelText.includes("city") || labelText.includes("location") || labelText.includes("address")) {
-      if (fillField(`#${input.id}` || `input[name="${input.name}"]`, profile.location)) fieldsFilled++;
+      if (fillFieldDirect(input, profile.portfolioUrl)) fieldsFilled++;
+    } else if (labelText.includes("city") || labelText.includes("location") || labelText.includes("address") || labelText.includes("street")) {
+      if (fillFieldDirect(input, profile.location)) fieldsFilled++;
     } else if (labelText.includes("experience") && labelText.includes("year")) {
-      if (fillField(`#${input.id}` || `input[name="${input.name}"]`, String(profile.yearsOfExperience || 0))) fieldsFilled++;
-    } else if (labelText.includes("cover") || labelText.includes("letter") || labelText.includes("additional") || labelText.includes("message") || labelText.includes("summary")) {
-      if (fillField(`#${input.id}` || `textarea[name="${input.name}"]`, profile.summary)) fieldsFilled++;
+      if (fillFieldDirect(input, String(profile.yearsOfExperience || 0))) fieldsFilled++;
+    } else if (labelText.includes("cover") || labelText.includes("letter") || labelText.includes("additional") || labelText.includes("message") || labelText.includes("summary") || labelText.includes("about you")) {
+      if (fillFieldDirect(input, profile.summary)) fieldsFilled++;
+    } else if (labelText.includes("company") || labelText.includes("employer")) {
+      if (fillFieldDirect(input, profile.mostRecentCompany)) fieldsFilled++;
+    } else if (labelText.includes("title") || labelText.includes("role") || labelText.includes("position")) {
+      if (fillFieldDirect(input, profile.mostRecentJobTitle)) fieldsFilled++;
+    } else if (labelText.includes("school") || labelText.includes("university") || labelText.includes("college")) {
+      if (fillFieldDirect(input, profile.highestEducation?.split(" - ").slice(-1)[0] || "")) fieldsFilled++;
+    } else if (labelText.includes("degree") || labelText.includes("education")) {
+      if (fillFieldDirect(input, profile.highestEducation?.split(" - ")[0] || "")) fieldsFilled++;
     }
   }
 
-  // Resume PDF injection
+  // 2. Fill select dropdowns
+  const selectElements = Array.from(document.querySelectorAll("select"));
+  for (const select of selectElements) {
+    const labelText = (() => {
+      if (select.id) {
+        const label = document.querySelector(`label[for="${select.id}"]`);
+        if (label) return label.textContent;
+      }
+      const parentLabel = select.closest("label");
+      if (parentLabel) return parentLabel.textContent;
+      return select.getAttribute("aria-label") || select.name || "";
+    })().toLowerCase();
+
+    if (labelText.includes("country")) {
+      if (fillSelect(select, "Bangladesh")) fieldsFilled++;
+    } else if (labelText.includes("gender")) {
+      if (fillSelect(select, "Male")) fieldsFilled++;
+    } else if (labelText.includes("experience") || labelText.includes("year")) {
+      if (fillSelect(select, String(profile.yearsOfExperience || 0))) fieldsFilled++;
+    } else if (labelText.includes("degree") || labelText.includes("education")) {
+      if (fillSelect(select, profile.highestEducation?.split(" - ")[0] || "")) fieldsFilled++;
+    }
+  }
+
+  // 3. Fill checkbox and radio inputs
+  const booleanInputs = Array.from(document.querySelectorAll("input[type='checkbox'], input[type='radio']"));
+  for (const input of booleanInputs) {
+    const labelText = (() => {
+      if (input.id) {
+        const label = document.querySelector(`label[for="${input.id}"]`);
+        if (label) return label.textContent;
+      }
+      const parentLabel = input.closest("label");
+      if (parentLabel) return parentLabel.textContent;
+      return input.getAttribute("aria-label") || input.name || "";
+    })();
+    if (fillBooleanInput(input, labelText)) fieldsFilled++;
+  }
+
+  // 4. Resume PDF upload
   if (profile.resumePdfUrl) {
     const fileInputs = Array.from(document.querySelectorAll("input[type='file']"));
     for (const fileInput of fileInputs) {
@@ -491,32 +622,146 @@ async function applyGeneric(profile) {
     }
   }
 
-  // Click Submit
-  let submitted = false;
-  const submitSelectors = [
-    "button[type='submit']",
-    "input[type='submit']",
-    "button.submit-button",
-    "button.apply-button",
-    "button[id*='submit']",
-    "button[class*='submit']",
-    "input[class*='submit']"
-  ];
+  // 5. Check if there are any empty required fields before submitting
+  function getEmptyRequiredFields() {
+    const requiredElements = Array.from(document.querySelectorAll(
+      "input[required], textarea[required], select[required], [aria-required='true']"
+    ));
+    const emptyRequired = [];
+    for (const el of requiredElements) {
+      // Check if the element is visible
+      const rect = el.getBoundingClientRect();
+      const isVisible = rect.width > 0 && rect.height > 0 && window.getComputedStyle(el).display !== 'none' && window.getComputedStyle(el).visibility !== 'hidden';
+      if (!isVisible) continue;
 
-  for (const selector of submitSelectors) {
-    const btn = document.querySelector(selector);
-    if (btn) {
-      const txt = (btn.textContent || btn.value || "").toLowerCase();
-      if (txt.includes("submit") || txt.includes("apply") || txt.includes("send") || txt.includes("finish")) {
-        btn.click();
-        submitted = true;
-        await delay(3000);
-        break;
+      // Check if it's empty
+      let isEmpty = false;
+      if (el.tagName === "INPUT" && (el.type === "checkbox" || el.type === "radio")) {
+        if (el.type === "radio") {
+          const name = el.getAttribute("name");
+          if (name) {
+            const checkedRadio = document.querySelector(`input[name="${name}"]:checked`);
+            if (!checkedRadio) isEmpty = true;
+          } else if (!el.checked) {
+            isEmpty = true;
+          }
+        } else if (!el.checked) {
+          isEmpty = true;
+        }
+      } else {
+        if (!el.value || el.value.trim() === "") {
+          isEmpty = true;
+        }
       }
+
+      if (isEmpty) {
+        let label = "";
+        if (el.id) {
+          const labelEl = document.querySelector(`label[for="${el.id}"]`);
+          if (labelEl) label = labelEl.textContent.trim();
+        }
+        if (!label) {
+          const parentLabel = el.closest("label");
+          if (parentLabel) label = parentLabel.textContent.trim();
+        }
+        if (!label) {
+          label = el.placeholder || el.name || el.getAttribute("aria-label") || "Required Field";
+        }
+        const cleanLabel = label.replace(/[:*]/g, "").trim();
+        if (cleanLabel) {
+          emptyRequired.push(cleanLabel);
+        }
+      }
+    }
+    return emptyRequired;
+  }
+
+  const emptyFields = getEmptyRequiredFields();
+  let submitted = false;
+  let skipSubmit = emptyFields.length > 0;
+  let reason = "";
+
+  if (skipSubmit) {
+    reason = `Manual review required: unfilled required fields (${emptyFields.slice(0, 3).join(", ")}${emptyFields.length > 3 ? "..." : ""})`;
+  } else {
+    const submitSelectors = [
+      "button[type='submit']",
+      "input[type='submit']",
+      "button.submit-button",
+      "button.apply-button",
+      "button[id*='submit']",
+      "button[class*='submit']",
+      "input[class*='submit']"
+    ];
+
+    for (const selector of submitSelectors) {
+      const btn = document.querySelector(selector);
+      if (btn) {
+        const txt = (btn.textContent || btn.value || "").toLowerCase();
+        if (txt.includes("submit") || txt.includes("apply") || txt.includes("send") || txt.includes("finish")) {
+          btn.click();
+          submitted = true;
+          await delay(3000);
+          break;
+        }
+      }
+    }
+
+    if (!submitted) {
+      reason = "Manual Apply required: no auto-submit button found";
     }
   }
 
-  return { fieldsFilled, submitted };
+  // 6. Show TalentFlow Autofill Banner
+  try {
+    const banner = document.createElement("div");
+    banner.id = "tf-autofill-banner";
+    banner.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      height: 48px !important;
+      background: linear-gradient(135deg, #003a9b, #0055e9) !important;
+      color: white !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 0 24px !important;
+      z-index: 999999999 !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      font-size: 14px !important;
+      font-weight: 600 !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    `;
+
+    const leftDiv = document.createElement("div");
+    leftDiv.style.display = "flex";
+    leftDiv.style.alignItems = "center";
+    leftDiv.style.gap = "8px";
+    leftDiv.innerHTML = `⚡ <strong>TalentFlow</strong> — Auto-filled ${fieldsFilled} fields! ${submitted ? 'Form submitted automatically.' : '<strong>Please review and submit manually.</strong>'}`;
+    banner.appendChild(leftDiv);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.textContent = "✕";
+    closeBtn.style.cssText = `
+      background: none !important;
+      border: none !important;
+      color: white !important;
+      cursor: pointer !important;
+      font-size: 16px !important;
+      padding: 4px 8px !important;
+    `;
+    closeBtn.onclick = () => banner.remove();
+    banner.appendChild(closeBtn);
+
+    document.body.prepend(banner);
+    document.body.style.paddingTop = "48px";
+  } catch (bannerErr) {
+    console.error("Failed to inject banner:", bannerErr);
+  }
+
+  return { success: !skipSubmit && submitted, fieldsFilled, submitted, error: reason || null, jobTitle: document.title, company: window.location.hostname };
 }
 
 // Check for pending external auto-apply state on page load
@@ -539,6 +784,10 @@ chrome.storage.local.get(["tf_auto_apply_pending"], async (data) => {
     const profRes = await fetch(`${APP_BASE}/api/extension/profile`, {
       headers: { Authorization: `Bearer ${pending.token}` }
     });
+    if (profRes.status === 401 || profRes.status === 403) {
+      chrome.runtime.sendMessage({ type: "TALENTFLOW_LOGOUT" }).catch(() => {});
+      throw new Error("Token expired or invalid. Please link your account again.");
+    }
     if (!profRes.ok) throw new Error("Could not load profile");
     const profile = await profRes.json();
     if (profile.error) throw new Error(profile.error);

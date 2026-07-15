@@ -56,8 +56,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         const body = await req.json();
         const { id } = await params;
 
-        // Allow updating basic fields
-        const { title, company, description, location, jobType, status } = body;
+        // Allow updating all job fields
+        const {
+            title,
+            company,
+            description,
+            location,
+            country,
+            jobType,
+            workMode,
+            experienceLevel,
+            salaryMin,
+            salaryMax,
+            requirements,
+            benefits,
+            tasks,
+            applicationDeadline,
+            isExternal,
+            externalUrl,
+            applicationMethod,
+            applicationEmail,
+        } = body;
 
         const updatedJob = await prisma.job.update({
             where: { id },
@@ -66,10 +85,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 company,
                 description,
                 location,
+                country,
                 jobType,
-                // status // If we had a status field (e.g. ACTIVE/CLOSED), we could update it. 
-                // The schema doesn't seem to have a status field explicitly, but we can add it later if needed.
-                // For now, we'll just update the fields present in the schema.
+                workMode,
+                experienceLevel,
+                salaryMin,
+                salaryMax,
+                requirements,
+                benefits,
+                tasks,
+                applicationDeadline: applicationDeadline ? new Date(applicationDeadline) : null,
+                isExternal: !!isExternal,
+                externalUrl,
+                applicationMethod,
+                applicationEmail,
             },
         });
 

@@ -39,6 +39,7 @@ interface Job {
 
 interface QueueEntry {
     id: string;
+    jobId?: string | null;
     jobUrl: string;
     status: string; // PENDING | PROCESSING | DONE | FAILED | SKIPPED
     queuedAt: string;
@@ -324,7 +325,7 @@ export default function FindJobsPage() {
     const [extensionConnected, setExtensionConnected] = useState(false);
     const [extensionInstalledLocal, setExtensionInstalledLocal] = useState(false);
     const [extensionAuthenticated, setExtensionAuthenticated] = useState(false);
-    const [queueMap, setQueueMap] = useState<Record<string, QueueEntry>>({}); // jobUrl -> QueueEntry
+    const [queueMap, setQueueMap] = useState<Record<string, QueueEntry>>({}); // jobId/jobUrl -> QueueEntry
     const [queuingId, setQueuingId] = useState<string | null>(null);
 
     // Bulk enqueuing state
@@ -347,6 +348,16 @@ export default function FindJobsPage() {
             await fetchQueue();
         })();
     }, []);
+
+    // Poll queue every 6 s while any job is still PENDING or PROCESSING
+    useEffect(() => {
+        const hasPending = Object.values(queueMap).some(
+            q => q.status === "PENDING" || q.status === "PROCESSING"
+        );
+        if (!hasPending) return;
+        const timer = setInterval(fetchQueue, 6000);
+        return () => clearInterval(timer);
+    }, [queueMap]);
 
     useEffect(() => {
         let active = true;
@@ -376,11 +387,15 @@ export default function FindJobsPage() {
         let out = jobs;
         if (mainTab === "applied") {
             // Jobs that are DONE in queue
-            const doneUrls = Object.values(queueMap).filter(q => q.status === "DONE").map(q => q.jobUrl);
-            out = out.filter(j => j.externalUrl && doneUrls.includes(j.externalUrl));
+            const doneJobIds = Object.values(queueMap)
+                .filter(q => q.status === "DONE" && q.jobId)
+                .map(q => q.jobId!);
+            out = out.filter(j => doneJobIds.includes(j.id));
         } else if (mainTab === "failed") {
-            const failedUrls = Object.values(queueMap).filter(q => q.status === "FAILED").map(q => q.jobUrl);
-            out = out.filter(j => j.externalUrl && failedUrls.includes(j.externalUrl));
+            const failedJobIds = Object.values(queueMap)
+                .filter(q => q.status === "FAILED" && q.jobId)
+                .map(q => q.jobId!);
+            out = out.filter(j => failedJobIds.includes(j.id));
         } else {
             if (typeFilter === "internal") out = out.filter(j => !j.isExternal);
             if (typeFilter === "external") out = out.filter(j => j.isExternal);
@@ -422,8 +437,17 @@ export default function FindJobsPage() {
             const res = await fetch("/api/extension/queue/history");
             if (res.ok) {
                 const entries: QueueEntry[] = await res.json();
+                // entries are sorted DESC (newest first) — keep only the FIRST
+                // occurrence per ID / URL so the most recent status wins, not the oldest.
                 const map: Record<string, QueueEntry> = {};
-                entries.forEach(e => { map[e.jobUrl] = e; });
+                entries.forEach(e => {
+                    if (e.jobId && !map[e.jobId]) {
+                        map[e.jobId] = e;
+                    }
+                    if (e.jobUrl && !map[e.jobUrl]) {
+                        map[e.jobUrl] = e;
+                    }
+                });
                 setQueueMap(map);
             }
         } catch { /* silent */ }
@@ -465,7 +489,7 @@ export default function FindJobsPage() {
                 return;
             }
             // Optimistically update queue map
-            setQueueMap(prev => ({ ...prev, [url]: data }));
+            setQueueMap(prev => ({ ...prev, [job.id]: data, [url]: data }));
             toast.success("Queued! Extension will auto-apply shortly ⚡");
         } catch {
             toast.error("Failed to queue job");
@@ -478,7 +502,7 @@ export default function FindJobsPage() {
         // Find matching external jobs that are not already enqueued (PENDING, PROCESSING, or DONE)
         const toQueue = filtered.filter(job => {
             if (!job.isExternal || !job.externalUrl) return false;
-            const entry = queueMap[job.externalUrl];
+            const entry = queueMap[job.id] || (job.externalUrl && queueMap[job.externalUrl] && (!queueMap[job.externalUrl].jobId || queueMap[job.externalUrl].jobId === job.id) ? queueMap[job.externalUrl] : undefined);
             return !entry || (entry.status !== "PENDING" && entry.status !== "PROCESSING" && entry.status !== "DONE");
         });
 
@@ -515,7 +539,7 @@ export default function FindJobsPage() {
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    setQueueMap(prev => ({ ...prev, [url]: data }));
+                    setQueueMap(prev => ({ ...prev, [job.id]: data, [url]: data }));
                     successCount++;
                 }
             } catch (err) {
@@ -939,7 +963,7 @@ export default function FindJobsPage() {
                                             ) : isExt ? (() => {
                                                 // Bot auto-apply button for external jobs
                                                 const url = job.externalUrl || "";
-                                                const qEntry = queueMap[url];
+                                                const qEntry = queueMap[job.id] || (url && queueMap[url] && (!queueMap[url].jobId || queueMap[url].jobId === job.id) ? queueMap[url] : undefined);
                                                 const isQueuing = queuingId === job.id;
 
                                                 if (qEntry?.status === "DONE") return (
@@ -948,7 +972,7 @@ export default function FindJobsPage() {
                                                     </span>
                                                 );
                                                 if (qEntry?.status === "FAILED") {
-                                                    const isNotEasyApply = qEntry.notes?.includes("No Easy Apply") || qEntry.notes?.includes("No Apply button");
+                                                    const isNotEasyApply = qEntry.notes?.includes("No Easy Apply") || qEntry.notes?.includes("No Apply button") || qEntry.notes?.toLowerCase().includes("manual");
                                                     return (
                                                         <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                                                             <span 

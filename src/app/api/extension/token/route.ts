@@ -24,7 +24,7 @@ export async function GET() {
         // Generate a random token and hash it for storage
         const rawToken = crypto.randomBytes(32).toString("hex");
         const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
         // Store hashed token in DB
         await prisma.user.update({

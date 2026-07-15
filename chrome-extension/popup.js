@@ -94,14 +94,20 @@ async function checkCurrentPage() {
   const url = tab?.url || "";
 
   const isJobPage = JOB_PATTERNS.some(p => p.test(url));
+  const isHttp = url.startsWith("http://") || url.startsWith("https://");
 
   if (isJobPage) {
-    pageStatusText.textContent = "✓ Job page detected — ready to auto apply!";
+    pageStatusText.textContent = "✓ Supported job page detected — ready to auto apply!";
+    pageStatusCard.style.background = "#f0fdf4";
+    pageStatusCard.style.borderColor = "#86efac";
+    applyBtn.disabled = false;
+  } else if (isHttp) {
+    pageStatusText.textContent = "✓ External page detected — ready to auto fill & apply!";
     pageStatusCard.style.background = "#f0fdf4";
     pageStatusCard.style.borderColor = "#86efac";
     applyBtn.disabled = false;
   } else {
-    pageStatusText.textContent = "Navigate to a job listing on LinkedIn, Indeed, Glassdoor, or Bdjobs to auto apply.";
+    pageStatusText.textContent = "Please navigate to a job listing or application form to auto apply.";
     pageStatusCard.style.background = "#fffbeb";
     pageStatusCard.style.borderColor = "#fde68a";
     applyBtn.disabled = true;

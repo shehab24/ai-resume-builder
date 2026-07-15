@@ -44,7 +44,11 @@ export async function POST(req: Request) {
                 company,
                 location: location || null,
                 description,
-                requirements,
+                requirements: typeof requirements === "string"
+                    ? requirements.split("\n").map(r => r.trim()).filter(Boolean)
+                    : Array.isArray(requirements)
+                    ? requirements
+                    : [],
 
                 // External job fields
                 isExternal: true,
