@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
-import { Prisma } from "@prisma/client";
 
 export async function GET(req: Request) {
     try {
@@ -10,73 +9,78 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Verify Admin Role
-        const currentUser = await prisma.user.findUnique({
-            where: { clerkId: userId },
-        });
-
+        const currentUser = await prisma.user.findUnique({ where: { clerkId: userId } });
         if (!currentUser || currentUser.role !== "ADMIN") {
             return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
         }
 
-        // Parse query params
         const { searchParams } = new URL(req.url);
-        const role = searchParams.get("role");
-        const search = searchParams.get("search");
-        const page = parseInt(searchParams.get("page") || "1");
-        const limit = parseInt(searchParams.get("limit") || "10");
-        const skip = (page - 1) * limit;
+        const role     = searchParams.get("role");
+        const search   = searchParams.get("search");
+        const activity = searchParams.get("activity");
+        const page     = parseInt(searchParams.get("page")  || "1");
+        const limit    = parseInt(searchParams.get("limit") || "20");
+        const skip     = (page - 1) * limit;
 
-        // Build filter
-        const where: Prisma.UserWhereInput = {};
+        const now           = new Date();
+        const oneDayAgo     = new Date(now.getTime() - 1  * 24 * 60 * 60 * 1000);
+        const sevenDaysAgo  = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-        if (role && role !== "ALL") {
-            where.role = role as any;
-        }
+        // Use `any` to bypass stale IDE Prisma type cache — lastSeenAt is in the schema
+        // and in the generated .prisma/client types; only @prisma/client wrapper is stale.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const where: any = {};
+
+        if (role && role !== "ALL") where.role = role;
 
         if (search) {
             where.OR = [
-                { name: { contains: search, mode: "insensitive" } },
+                { name:  { contains: search, mode: "insensitive" } },
                 { email: { contains: search, mode: "insensitive" } },
             ];
         }
 
-        // Fetch users
+        // Activity filter — uses lastSeenAt (updated on every real page visit via /api/user/ping)
+        if (activity === "active-today")  where.lastSeenAt = { gte: oneDayAgo };
+        if (activity === "active-week")   where.lastSeenAt = { gte: sevenDaysAgo };
+        if (activity === "active-month")  where.lastSeenAt = { gte: thirtyDaysAgo };
+        // "Never visited" = lastSeenAt field is missing entirely (users before this feature)
+        // OR explicitly null. isSet:false is the Prisma MongoDB operator for missing fields.
+        if (activity === "never-visited") {
+            where.OR = [
+                ...(where.OR ?? []),
+                { lastSeenAt: { isSet: false } },
+                { lastSeenAt: null },
+            ];
+        }
+
         const [users, total] = await Promise.all([
             prisma.user.findMany({
                 where,
                 skip,
-                take: limit,
-                orderBy: { createdAt: "desc" },
+                take:      limit,
+                orderBy:   { lastSeenAt: "desc" } as any,   // most-recently-seen first
                 select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    role: true,
-                    country: true,
-                    createdAt: true,
-                    isBlocked: true,
+                    id:          true,
+                    name:        true,
+                    email:       true,
+                    role:        true,
+                    country:     true,
+                    createdAt:   true,
+                    lastSeenAt:  true,
+                    isBlocked:   true,
                     blockedUntil: true,
                     warningCount: true,
-                    _count: {
-                        select: {
-                            postedJobs: true,
-                            applications: true,
-                        }
-                    }
-                }
+                    _count: { select: { postedJobs: true, applications: true } },
+                } as any,
             }),
             prisma.user.count({ where }),
         ]);
 
         return NextResponse.json({
             users,
-            pagination: {
-                total,
-                pages: Math.ceil(total / limit),
-                page,
-                limit
-            }
+            pagination: { total, pages: Math.ceil(total / limit), page, limit },
         });
     } catch (error) {
         console.error("Error fetching users:", error);

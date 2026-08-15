@@ -1,0 +1,7 @@
+- Before writing any code or answering prompts, always read the 'FEATURES.md' file in the root directory to understand the current project goals and step-by-step roadmap.
+- Follow the sequence laid out in 'FEATURES.md' and update it when a step is completed.
+- NEVER delete or clear the contents of 'FEATURES.md'.
+- If any features and fucntionality you add simply write on FEATURES.md  adding step by step an never delete the old history
+- Never Reset or delete database or any production lavel information since we use same database for production and development
+- always ask user before deleting any data or making any major changes
+- never change the connection string of the database

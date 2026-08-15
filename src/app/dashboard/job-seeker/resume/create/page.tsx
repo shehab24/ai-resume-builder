@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useAuth, SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, Sparkles, FileText, Clock, Trash2, Star, Eye, X } from "lucide-react";
+import { Loader2, Sparkles, FileText, Clock, Trash2, Star, Eye, X, LogIn, Download, Edit } from "lucide-react";
 import Link from "next/link";
 import {
     AlertDialog,
@@ -21,6 +22,7 @@ import {
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
+import { ResumeTemplate } from "@/components/resume-templates";
 
 const TEMPLATES = [
     {
@@ -59,6 +61,7 @@ interface ResumeLimit {
 }
 
 export default function CreateResumePage() {
+    const { isSignedIn } = useAuth();
     const [selectedTemplate, setSelectedTemplate] = useState("professional");
     const [prompt, setPrompt] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
@@ -70,6 +73,15 @@ export default function CreateResumePage() {
     const [settingDefault, setSettingDefault] = useState<string | null>(null);
     const [resumeLimit, setResumeLimit] = useState<ResumeLimit | null>(null);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+    const [generatedContent, setGeneratedContent] = useState<any>(null); // Store generated resume before saving
+    const [showPreview, setShowPreview] = useState(false);
+    const [editableResume, setEditableResume] = useState<any>(null);
+    const [showEditMode, setShowEditMode] = useState(false);
+    const [showDesignPanel, setShowDesignPanel] = useState(false);
+
+    // Ref to track if we've already processed the pending resume
+    const hasSavedPendingResume = useRef(false);
 
     useEffect(() => {
         fetchAllResumes();
@@ -92,7 +104,75 @@ export default function CreateResumePage() {
         localStorage.setItem("resume_template_draft", selectedTemplate);
     }, [selectedTemplate]);
 
+    // Check for pending resume (from public page after login)
+    useEffect(() => {
+        if (isSignedIn) {
+            const pending = localStorage.getItem("pending_resume");
+            if (pending && !hasSavedPendingResume.current) {
+                console.log("Dashboard: Pending resume detected, will auto-save...");
+                
+                // Mark as being processed to prevent duplicate saves
+                hasSavedPendingResume.current = true;
+                
+                // Auto-save the pending resume
+                const savePendingResume = async () => {
+                    try {
+                        const data = JSON.parse(pending);
+                        
+                        console.log("Dashboard: Found pending resume, auto-saving...", data);
+                        
+                        // Save to database
+                        const response = await fetch("/api/resume/save", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                templateId: data.templateId || "professional",
+                                personalInfo: data.content.personalInfo,
+                                summary: data.content.summary,
+                                skills: data.content.skills,
+                                experience: data.content.experience,
+                                education: data.content.education,
+                            }),
+                        });
+
+                        const result = await response.json();
+
+                        if (response.ok) {
+                            console.log("Dashboard: Resume auto-saved successfully:", result.resumeId);
+                            
+                            // Clear localStorage
+                            localStorage.removeItem("pending_resume");
+                            
+                            // Refresh the resumes list
+                            await fetchAllResumes();
+                            
+                            // Show success message
+                            toast.success("✅ Your resume has been saved!", {
+                                description: "You can view and edit it in 'Your Resumes' section below.",
+                                duration: 7000,
+                            });
+                        } else {
+                            throw new Error(result.message || "Failed to save resume");
+                        }
+                    } catch (error) {
+                        console.error("Failed to auto-save pending resume:", error);
+                        toast.error("Failed to save your resume. Please try creating it again.");
+                        localStorage.removeItem("pending_resume");
+                        // Reset the flag on error so user can try again
+                        hasSavedPendingResume.current = false;
+                    }
+                };
+                
+                savePendingResume();
+            }
+        }
+    }, [isSignedIn]);
+
     const fetchResumeLimit = async () => {
+        if (!isSignedIn) {
+            setResumeLimit(null);
+            return;
+        }
         try {
             const response = await fetch("/api/user/resume-limit");
             if (response.ok) {
@@ -105,6 +185,11 @@ export default function CreateResumePage() {
     };
 
     const fetchAllResumes = async () => {
+        if (!isSignedIn) {
+            setAllResumes([]);
+            setLoadingResumes(false);
+            return;
+        }
         try {
             const response = await fetch("/api/resumes");
             if (response.ok) {
@@ -125,7 +210,68 @@ export default function CreateResumePage() {
         }
 
         setIsGenerating(true);
+        
         try {
+            // If user is not signed in, generate preview only
+            if (!isSignedIn) {
+                const response = await fetch("/api/resume/preview", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        personalInfo: {},
+                        professionalSummary: prompt,
+                        skills: [],
+                        experience: [],
+                        education: []
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to generate preview");
+                }
+
+                const data = await response.json();
+                
+                // Store the generated content and template
+                setGeneratedContent({
+                    content: data.content,
+                    prompt: prompt,
+                    templateId: selectedTemplate
+                });
+                
+                // Set editable resume for preview
+                setEditableResume(data.content);
+                
+                // Store in localStorage as backup
+                localStorage.setItem("pending_resume", JSON.stringify({
+                    content: data.content,
+                    prompt: prompt,
+                    templateId: selectedTemplate,
+                    timestamp: new Date().toISOString()
+                }));
+                
+                // Show preview section
+                setShowPreview(true);
+                
+                toast.success("✅ Resume generated successfully!");
+                toast.info("Review and edit your resume below, then save to download", {
+                    duration: 5000,
+                });
+                
+                setIsGenerating(false);
+                
+                // Scroll to preview
+                setTimeout(() => {
+                    document.getElementById('resume-preview')?.scrollIntoView({ 
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }, 100);
+                
+                return;
+            }
+
+            // For authenticated users, generate and save immediately
             const response = await fetch("/api/resume/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -238,6 +384,71 @@ export default function CreateResumePage() {
         }
     };
 
+    const handleSaveResume = async () => {
+        if (!isSignedIn) {
+            setShowLoginPrompt(true);
+            toast.error("Please sign in to save your resume");
+            return;
+        }
+
+        if (!generatedContent) {
+            toast.error("No resume to save. Please generate a resume first.");
+            return;
+        }
+
+        setIsGenerating(true);
+        try {
+            const response = await fetch("/api/resume/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    prompt: generatedContent.prompt,
+                    templateId: generatedContent.templateId
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to save resume");
+            }
+
+            toast.success("✅ Resume saved successfully!");
+
+            // Clear the pending resume
+            setGeneratedContent(null);
+            localStorage.removeItem("pending_resume");
+            localStorage.removeItem("resume_prompt_draft");
+            localStorage.removeItem("resume_template_draft");
+
+            // Redirect to resume view page
+            window.location.href = `/dashboard/job-seeker/resume/${data.resumeId}`;
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to save resume. Please try again.");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    // Check for pending resume on mount (after user logs in)
+    useEffect(() => {
+        if (isSignedIn) {
+            const pending = localStorage.getItem("pending_resume");
+            if (pending) {
+                try {
+                    const data = JSON.parse(pending);
+                    setGeneratedContent(data);
+                    toast.info("You have an unsaved resume. Click 'Save & Download' to save it.", {
+                        duration: 7000,
+                    });
+                } catch (error) {
+                    console.error("Failed to parse pending resume:", error);
+                }
+            }
+        }
+    }, [isSignedIn]);
+
     return (
         <div className="max-w-6xl mx-auto space-y-8">
             {/* Header */}
@@ -255,6 +466,27 @@ export default function CreateResumePage() {
                 )}
             </div>
 
+            {/* Info banner for unauthenticated users */}
+            {!isSignedIn && (
+                <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+                    <CardContent className="pt-6">
+                        <div className="flex items-start gap-3">
+                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center flex-shrink-0">
+                                <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                                    Try Our AI Resume Builder - No Sign Up Required!
+                                </h3>
+                                <p className="text-sm text-blue-800 dark:text-blue-200">
+                                    Fill in your details below and preview your AI-enhanced resume. You'll only need to sign in when you're ready to save and download.
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Show upgrade prompt if limit reached */}
             {resumeLimit && !resumeLimit.canCreate ? (
                 <UpgradePrompt
@@ -265,8 +497,9 @@ export default function CreateResumePage() {
                 />
             ) : (
                 <>
-                    {/* Main Content */}
-                    <div className="grid gap-8 lg:grid-cols-2">
+                    {/* Main Content - Only show when NOT in preview mode */}
+                    {!showPreview && (
+                        <div className="grid gap-8 lg:grid-cols-2">
                         {/* Template Selection */}
                         <Card className="border-2 h-full flex flex-col">
                             <CardHeader>
@@ -380,7 +613,74 @@ export default function CreateResumePage() {
                             </CardContent>
                         </Card>
                     </div>
+                    )}
                 </>
+            )}
+
+            {/* Resume Preview & Edit Section */}
+            {showPreview && editableResume && (
+                <div id="resume-preview" className="space-y-6 mt-8">
+                    {/* Preview Header with Actions */}
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-3xl font-bold">Resume Preview</h2>
+                        <div className="flex gap-3">
+                            <Button
+                                variant="outline"
+                                size="default"
+                                onClick={() => {
+                                    // Scroll to template selection
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                            >
+                                <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                                </svg>
+                                Design
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="default"
+                                onClick={() => {
+                                    // Scroll to Step 2 (prompt textarea)
+                                    const promptElement = document.getElementById('prompt');
+                                    promptElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    promptElement?.focus();
+                                }}
+                            >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                            </Button>
+                            <Button
+                                onClick={handleSaveResume}
+                                className="bg-black hover:bg-gray-800 text-white"
+                                disabled={isGenerating}
+                                size="default"
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Download PDF
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Visual Resume Preview Card */}
+                    <Card className="bg-white shadow-lg">
+                        <CardContent className="p-12">
+                            <ResumeTemplate 
+                                data={editableResume} 
+                                template={selectedTemplate as 'professional' | 'modern' | 'classic'}
+                            />
+                        </CardContent>
+                    </Card>
+                </div>
             )}
 
             {/* All Resumes */}
@@ -498,6 +798,38 @@ export default function CreateResumePage() {
                                 className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl bg-white"
                             />
                         )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Login Prompt Dialog */}
+            <Dialog open={showLoginPrompt} onOpenChange={setShowLoginPrompt}>
+                <DialogContent className="sm:max-w-md">
+                    <div className="flex flex-col items-center text-center space-y-4 py-6">
+                        <div className="h-16 w-16 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                            <LogIn className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-semibold">Sign in to Save Your Resume</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Create a free account to generate, save, and download your AI-powered resume
+                            </p>
+                        </div>
+                        <div className="flex flex-col gap-3 w-full pt-4">
+                            <SignInButton mode="modal">
+                                <Button className="w-full" size="lg">
+                                    <LogIn className="mr-2 h-4 w-4" />
+                                    Sign In to Continue
+                                </Button>
+                            </SignInButton>
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowLoginPrompt(false)}
+                                className="w-full"
+                            >
+                                Continue Editing
+                            </Button>
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>

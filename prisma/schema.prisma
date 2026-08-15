@@ -18,6 +18,7 @@ enum RecruiterStatus {
   PENDING
   APPROVED
   REJECTED
+  BLOCKED
 }
 
 model User {
@@ -38,6 +39,7 @@ model User {
   
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  lastSeenAt        DateTime? // Updated on every authenticated page visit
 
   // Moderation
   isBlocked         Boolean  @default(false)
@@ -47,6 +49,8 @@ model User {
   // Job Seeker relations
   resumes      Resume[]
   applications Application[]
+  externalApplications ExternalApplication[]
+  extensionQueue       ExtensionQueue[]
 
   // Recruiter relations
   // Recruiter relations
@@ -58,6 +62,15 @@ model User {
   // Payment relations
   subscriptions Subscription[]
   payments      Payment[]
+
+  // Chrome Extension Auth
+  extensionToken       String?   // Hashed token for extension authentication
+  extensionTokenExpiry DateTime? // Token expiry timestamp
+  extensionConnectedAt DateTime? // When extension was last connected
+
+  // LinkedIn Integration
+  linkedinProfileUrl   String?   // User's public LinkedIn profile URL
+  linkedinConnectedAt  DateTime? // When LinkedIn was connected
 }
 
 model Notification {
@@ -82,6 +95,8 @@ model Resume {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  applications Application[]
 }
 
 model Job {
@@ -162,6 +177,8 @@ model Application {
   taskScore        Int?     // 0-100: AI evaluation of task submissions
   compositeScore   Int?     // 0-100: Weighted average (40% resume + 60% task)
   aiEvaluation     String?  // AI's detailed feedback on candidate
+  resumeId         String?  @db.ObjectId // Reference to the selected resume
+  resume           Resume?  @relation(fields: [resumeId], references: [id])
   resumeContent    Json?    // Snapshot of resume content at time of application
   isTopCandidate   Boolean  @default(false) // Auto-set for top 10 candidates
   
@@ -306,3 +323,46 @@ model VerificationToken {
   
   @@unique([identifier, token])
 }
+
+// Tracks applications submitted via the Chrome Extension on external job sites
+model ExternalApplication {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  jobTitle  String
+  company   String?
+  jobUrl    String
+  platform  String?  // "linkedin" | "indeed" | "glassdoor" | "bdjobs"
+  status    String   @default("APPLIED") // "APPLIED" | "FAILED"
+  notes     String?
+  appliedAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([appliedAt])
+}
+
+// Queue for bot-style auto-apply: dashboard adds jobs, extension processes them
+model ExtensionQueue {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String    @db.ObjectId
+  user        User      @relation(fields: [userId], references: [id])
+
+  // Job details (snapshot — job may be internal or external)
+  jobId       String?   // Internal Job.id if available
+  jobTitle    String
+  company     String?
+  jobUrl      String    // The URL the extension will open and apply on
+  platform    String?   // "linkedin" | "indeed" | "glassdoor" | "bdjobs" | "other"
+
+  // Status lifecycle: PENDING → PROCESSING → DONE | FAILED | SKIPPED
+  status      String    @default("PENDING")
+  notes       String?   // Error message or notes on completion
+
+  queuedAt    DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([userId, status])
+  @@index([userId])
+  @@index([status])
+}
+

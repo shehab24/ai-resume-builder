@@ -2,18 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CountrySelect } from "@/components/CountrySelect";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
-import { Loader2, Save, User as UserIcon, Camera, Award, FileText, Crown } from "lucide-react";
+import { Loader2, Save, User as UserIcon, Camera, Award, FileText, Crown, ArrowLeft, Upload, MapPin, Mail, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSubscription } from "@/hooks/use-subscription";
-import { Badge } from "@/components/ui/badge";
+import { useUser } from "@clerk/nextjs";
 
 interface UserProfile {
     name: string;
@@ -21,13 +17,403 @@ interface UserProfile {
     country: string;
     photoUrl?: string;
     autoApply: boolean;
-    matchThreshold: number; // 0-100 percentage
-    autoApplyCountry: string; // optional country filter for auto-apply
+    matchThreshold: number;
+    autoApplyCountry: string;
     warningCount: number;
 }
 
+/* ─── Styles ─── */
+const profileStyles = `
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    .rl-profile-page {
+        max-width: 780px;
+        margin: 0 auto;
+        padding: 0 24px 60px;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #1e293b;
+        font-size: 15px;
+        font-weight: 500;
+        text-decoration: none;
+        padding: 12px 0 24px;
+        transition: color 150ms;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-back-link:hover {
+        color: #003a9b;
+    }
+    .rl-profile-card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 24px;
+        padding: 32px;
+        margin-bottom: 16px;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-profile-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 24px;
+    }
+    .rl-profile-info {
+        flex: 1;
+    }
+    .rl-profile-badge {
+        display: inline-block;
+        padding: 4px 14px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 16px;
+    }
+    .rl-badge-free {
+        background: #dcfce7;
+        color: #166534;
+    }
+    .rl-badge-pro {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    .rl-profile-avatar-lg {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid #e2e8f0;
+        flex-shrink: 0;
+    }
+    .rl-profile-avatar-fallback {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: #f1f5f9;
+        border: 3px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .rl-profile-avatar-fallback svg {
+        width: 32px;
+        height: 32px;
+        color: #94a3b8;
+    }
+    .rl-info-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        color: #64748b;
+        margin-bottom: 8px;
+    }
+    .rl-info-row svg {
+        width: 16px;
+        height: 16px;
+        color: #94a3b8;
+        flex-shrink: 0;
+    }
+    .rl-section-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 16px;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-section-desc {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+    .rl-resume-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+    }
+    .rl-resume-status {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #94a3b8;
+        font-size: 14px;
+    }
+    .rl-resume-status svg {
+        width: 24px;
+        height: 24px;
+    }
+    .rl-btn-dark {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #111827;
+        color: #fff;
+        border: none;
+        border-radius: 999px;
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 150ms;
+        text-decoration: none;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-btn-dark:hover {
+        background: #1f2937;
+    }
+    .rl-btn-danger {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #dc2626;
+        color: #fff;
+        border: none;
+        border-radius: 999px;
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 150ms;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-btn-danger:hover {
+        background: #b91c1c;
+    }
+    .rl-btn-save {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: #003a9b;
+        color: #fff;
+        border: none;
+        border-radius: 999px;
+        padding: 14px 32px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 150ms;
+        width: 100%;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-btn-save:hover {
+        background: #002d7a;
+    }
+    .rl-btn-save:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    .rl-credits-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
+    .rl-credits-label {
+        font-size: 15px;
+        font-weight: 600;
+        color: #111827;
+    }
+    .rl-credits-value {
+        font-size: 15px;
+        color: #64748b;
+    }
+    .rl-usage-actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .rl-view-link {
+        font-size: 14px;
+        color: #003a9b;
+        text-decoration: underline;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    .rl-danger-card {
+        background: #fff;
+        border: 1px solid #fecaca;
+        border-radius: 24px;
+        padding: 32px;
+        margin-bottom: 16px;
+    }
+    .rl-danger-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #dc2626;
+        margin-bottom: 8px;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-danger-desc {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+    .rl-form-group {
+        margin-bottom: 20px;
+    }
+    .rl-form-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 6px;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        font-size: 14px;
+        color: #111827;
+        background: #fff;
+        outline: none;
+        transition: border 150ms;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-form-input:focus {
+        border-color: #003a9b;
+    }
+    .rl-form-input:disabled {
+        background: #f9fafb;
+        color: #9ca3af;
+    }
+    .rl-form-hint {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-top: 4px;
+    }
+    .rl-auto-apply-card {
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 24px;
+    }
+    .rl-auto-apply-card.free {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+    }
+    .rl-auto-apply-card.pro {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+    }
+    .rl-toggle-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+    }
+    .rl-toggle-label {
+        font-size: 15px;
+        font-weight: 600;
+        color: #111827;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .rl-toggle-desc {
+        font-size: 13px;
+        color: #6b7280;
+        margin-top: 4px;
+        line-height: 1.5;
+    }
+    .rl-toggle-switch {
+        width: 48px;
+        height: 26px;
+        border-radius: 999px;
+        appearance: none;
+        cursor: pointer;
+        position: relative;
+        transition: background-color 200ms;
+        background: #d1d5db;
+        flex-shrink: 0;
+        border: none;
+        outline: none;
+    }
+    .rl-toggle-switch::before {
+        content: '';
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #fff;
+        top: 3px;
+        left: 3px;
+        transition: transform 200ms;
+    }
+    .rl-toggle-switch:checked {
+        background: #003a9b;
+    }
+    .rl-toggle-switch:checked::before {
+        transform: translateX(22px);
+    }
+    .rl-toggle-switch:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .rl-upgrade-banner {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(0,0,0,0.08);
+    }
+    .rl-btn-upgrade {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: #f59e0b;
+        color: #fff;
+        border: none;
+        border-radius: 999px;
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 150ms;
+        width: 100%;
+        font-family: 'Inter', sans-serif;
+    }
+    .rl-btn-upgrade:hover {
+        background: #d97706;
+    }
+    .rl-warning-card {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 24px;
+        padding: 24px 32px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+    }
+    .rl-warning-icon {
+        background: #fef3c7;
+        border-radius: 50%;
+        padding: 8px;
+        flex-shrink: 0;
+    }
+    .rl-warning-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #78350f;
+        margin-bottom: 4px;
+    }
+    .rl-warning-text {
+        font-size: 13px;
+        color: #92400e;
+        line-height: 1.5;
+    }
+`;
+
 export default function ProfilePage() {
     const router = useRouter();
+    const { user: clerkUser } = useUser();
     const [profile, setProfile] = useState<UserProfile>({
         name: "",
         email: "",
@@ -82,9 +468,7 @@ export default function ProfilePage() {
             if (res.ok) {
                 const data = await res.json();
                 setResumeCount(data.resumes?.length || 0);
-                // Calculate average score if resumes have scores
                 if (data.resumes && data.resumes.length > 0) {
-                    // For now, set a mock score - you can implement actual scoring logic
                     setResumeScore(75);
                 }
             }
@@ -113,14 +497,12 @@ export default function ProfilePage() {
             return;
         }
 
-        // Check if trying to enable auto-apply without Pro
         if (profile.autoApply && !isPro) {
             toast.error("Auto-Apply is a Pro feature! Upgrade to enable it.");
             setProfile({ ...profile, autoApply: false });
             return;
         }
 
-        // Ensure matchThreshold is within 0-100
         if (profile.matchThreshold < 0 || profile.matchThreshold > 100) {
             toast.error("Match threshold must be between 0 and 100");
             return;
@@ -147,19 +529,12 @@ export default function ProfilePage() {
             }
 
             const updatedData = await res.json();
-
             toast.success("Profile updated successfully!");
+            setProfile({ ...profile, ...updatedData });
 
-            // Update local state with server response
-            setProfile({
-                ...profile,
-                ...updatedData,
-            });
-
-            // Redirect to dashboard after successful save
             setTimeout(() => {
                 router.push("/dashboard/job-seeker");
-            }, 1000); // Small delay to show success message
+            }, 1000);
         } catch (error) {
             console.error("Error saving profile:", error);
             toast.error(error instanceof Error ? error.message : "Failed to update profile");
@@ -168,272 +543,253 @@ export default function ProfilePage() {
         }
     };
 
+    const avatarUrl = profile.photoUrl || clerkUser?.imageUrl;
+
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <Loader2 className="h-8 w-8 animate-spin" />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+                <Loader2 style={{ width: 32, height: 32, animation: "spin 1s linear infinite" }} />
             </div>
         );
     }
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold">Profile Settings</h1>
-                <p className="text-muted-foreground mt-2">Manage your account and preferences</p>
-            </div>
+        <>
+            <style dangerouslySetInnerHTML={{ __html: profileStyles }} />
+            <div className="rl-profile-page">
 
-            {/* Warning Banner */}
-            {profile.warningCount > 0 && (
-                <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
-                    <CardContent className="pt-6">
-                        <div className="flex items-start gap-3">
-                            <div className="bg-orange-100 dark:bg-orange-900 p-2 rounded-full">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-orange-900 dark:text-orange-100 text-lg">
-                                    ⚠️ Account Warning
-                                </h3>
-                                <p className="text-sm text-orange-800 dark:text-orange-200 mt-2">
-                                    You have received <strong>{profile.warningCount}</strong> warning{profile.warningCount > 1 ? 's' : ''} for violating our community guidelines.
-                                    Please review our terms of service and ensure compliance to avoid account suspension.
-                                </p>
-                                <p className="text-xs text-orange-700 dark:text-orange-300 mt-2">
-                                    Check your notifications for details about the warnings.
-                                </p>
-                            </div>
+                {/* Back Link */}
+                <Link href="/dashboard/job-seeker" className="rl-back-link">
+                    <ArrowLeft size={18} />
+                    Back
+                </Link>
+
+                {/* Warning Banner */}
+                {profile.warningCount > 0 && (
+                    <div className="rl-warning-card">
+                        <div className="rl-warning-icon">
+                            <AlertTriangle size={20} color="#ca8a04" />
                         </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Profile Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardDescription>Resume Score</CardDescription>
-                        <CardTitle className="text-3xl flex items-center gap-2">
-                            {resumeScore ? `${resumeScore}%` : "N/A"}
-                            <Award className="h-6 w-6 text-yellow-500" />
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {resumeScore && <Progress value={resumeScore} className="h-2" />}
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardDescription>Resumes Created</CardDescription>
-                        <CardTitle className="text-3xl flex items-center gap-2">
-                            {resumeCount}
-                            <FileText className="h-6 w-6 text-blue-500" />
-                        </CardTitle>
-                    </CardHeader>
-                </Card>
-
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardDescription>Profile Completion</CardDescription>
-                        <CardTitle className="text-3xl">
-                            {profile.country && profile.name ? "100%" : profile.name || profile.country ? "50%" : "0%"}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Progress value={profile.country && profile.name ? 100 : profile.name || profile.country ? 50 : 0} className="h-2" />
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Profile Photo */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Camera className="h-5 w-5" />
-                        Profile Photo
-                    </CardTitle>
-                    <CardDescription>
-                        Enter an image URL for your profile photo
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex items-center gap-6">
-                        <Avatar className="h-24 w-24">
-                            <AvatarImage src={profile.photoUrl} />
-                            <AvatarFallback className="text-2xl">
-                                {profile.name?.charAt(0)?.toUpperCase() || profile.email?.charAt(0)?.toUpperCase() || "U"}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 space-y-2">
-                            <Label htmlFor="photo-url">Image URL</Label>
-                            <Input
-                                id="photo-url"
-                                type="url"
-                                placeholder="https://example.com/your-photo.jpg"
-                                value={profile.photoUrl || ""}
-                                onChange={(e) => setProfile({ ...profile, photoUrl: e.target.value })}
-                                className="max-w-md"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Paste a URL to an image (e.g., from Imgur, your website, or any public image URL)
-                            </p>
+                        <div>
+                            <div className="rl-warning-title">
+                                ⚠️ Account Warning
+                            </div>
+                            <div className="rl-warning-text">
+                                You have received <strong>{profile.warningCount}</strong> warning{profile.warningCount > 1 ? 's' : ''} for violating our community guidelines.
+                                Please review our terms of service and ensure compliance to avoid account suspension.
+                            </div>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+                )}
 
-            {/* Personal Information */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <UserIcon className="h-5 w-5" />
-                        Personal Information
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Full Name</Label>
-                            <Input
-                                id="name"
+                {/* Profile Info Card */}
+                <div className="rl-profile-card">
+                    <div className="rl-profile-header">
+                        <div className="rl-profile-info">
+                            <span className={`rl-profile-badge ${isPro ? 'rl-badge-pro' : 'rl-badge-free'}`}>
+                                {isPro ? 'Pro' : 'Free'}
+                            </span>
+                            <div className="rl-info-row">
+                                <Mail size={16} />
+                                <span>{profile.email || "No email set"}</span>
+                            </div>
+                            <div className="rl-info-row">
+                                <MapPin size={16} />
+                                <span>{profile.country || "N/A"}</span>
+                            </div>
+                        </div>
+                        {avatarUrl ? (
+                            <img src={avatarUrl} alt="Profile" className="rl-profile-avatar-lg" />
+                        ) : (
+                            <div className="rl-profile-avatar-fallback">
+                                <UserIcon />
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Base Resume Card */}
+                <div className="rl-profile-card">
+                    <h2 className="rl-section-title">Base Resume</h2>
+                    <div className="rl-resume-row">
+                        <div className="rl-resume-status">
+                            <FileText size={24} />
+                            <span>{resumeCount > 0 ? `${resumeCount} Resume${resumeCount > 1 ? 's' : ''} Available` : "Not Available"}</span>
+                        </div>
+                        <Link href="/dashboard/job-seeker/resume/create" className="rl-btn-dark">
+                            <Upload size={16} />
+                            Upload Resume
+                        </Link>
+                    </div>
+                </div>
+
+                {/* Usage Card */}
+                <div className="rl-profile-card">
+                    <h2 className="rl-section-title">Usage</h2>
+                    <p className="rl-section-desc">
+                        Track your usage and unlock more credits when you&apos;re ready to do more
+                    </p>
+                    <div className="rl-credits-row">
+                        <span className="rl-credits-label">Credits</span>
+                        <span className="rl-credits-value">{isPro ? "Unlimited" : "0 / 100"}</span>
+                    </div>
+                    <div className="rl-usage-actions">
+                        {!isPro && (
+                            <button
+                                className="rl-btn-dark"
+                                onClick={() => subscribe('PRO', 299)}
+                                disabled={subscribing}
+                            >
+                                <Crown size={14} />
+                                {subscribing ? 'Processing...' : 'Upgrade Now'}
+                            </button>
+                        )}
+                        <span className="rl-view-link">View Usage</span>
+                    </div>
+                </div>
+
+                {/* Personal Information Card */}
+                <div className="rl-profile-card">
+                    <h2 className="rl-section-title">Personal Information</h2>
+                    <form onSubmit={handleSubmit}>
+                        <div className="rl-form-group">
+                            <label className="rl-form-label">Full Name</label>
+                            <input
+                                className="rl-form-input"
                                 value={profile.name}
                                 onChange={(e) => setProfile({ ...profile, name: e.target.value })}
                                 placeholder="John Doe"
                             />
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input
-                                id="email"
+                        <div className="rl-form-group">
+                            <label className="rl-form-label">Email</label>
+                            <input
+                                className="rl-form-input"
                                 type="email"
                                 value={profile.email}
                                 disabled
-                                className="bg-muted"
                             />
-                            <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                            <p className="rl-form-hint">Email cannot be changed</p>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="country">
-                                Country <span className="text-red-500">*</span>
-                            </Label>
+                        <div className="rl-form-group">
+                            <label className="rl-form-label">
+                                Country <span style={{ color: "#dc2626" }}>*</span>
+                            </label>
                             <CountrySelect
                                 value={profile.country}
                                 onValueChange={(value) => setProfile({ ...profile, country: value })}
                                 placeholder="Select your country"
                             />
                             {!profile.country && (
-                                <p className="text-xs text-red-500">Country is required to complete your profile</p>
+                                <p style={{ fontSize: 12, color: "#dc2626", marginTop: 4 }}>
+                                    Country is required to complete your profile
+                                </p>
                             )}
+                        </div>
+
+                        <div className="rl-form-group">
+                            <label className="rl-form-label">Profile Photo URL</label>
+                            <input
+                                className="rl-form-input"
+                                type="url"
+                                placeholder="https://example.com/your-photo.jpg"
+                                value={profile.photoUrl || ""}
+                                onChange={(e) => setProfile({ ...profile, photoUrl: e.target.value })}
+                            />
+                            <p className="rl-form-hint">
+                                Paste a URL to an image (e.g., from Imgur, your website, or any public image URL)
+                            </p>
                         </div>
 
                         {/* Auto-Apply Toggle */}
-                        <div className={`space-y-3 p-4 rounded-lg border ${isPro ? 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800' : 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800'}`}>
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <Label htmlFor="autoApply" className={`text-base font-semibold ${isPro ? 'text-blue-900 dark:text-blue-100' : 'text-amber-900 dark:text-amber-100'}`}>
-                                            {isPro ? '🚀' : <Crown className="h-4 w-4 inline" />} Enable Auto-Apply
-                                        </Label>
+                        <div className={`rl-auto-apply-card ${isPro ? 'pro' : 'free'}`}>
+                            <div className="rl-toggle-row">
+                                <div style={{ flex: 1 }}>
+                                    <div className="rl-toggle-label">
+                                        {isPro ? '🚀' : <Crown size={16} color="#f59e0b" />}
+                                        Enable Auto-Apply
                                         {!isPro && (
-                                            <Badge variant="secondary" className="text-[10px] bg-amber-200 text-amber-900">
-                                                PRO
-                                            </Badge>
+                                            <span style={{
+                                                fontSize: 10,
+                                                fontWeight: 600,
+                                                background: "#fde68a",
+                                                color: "#92400e",
+                                                padding: "2px 8px",
+                                                borderRadius: 999
+                                            }}>PRO</span>
                                         )}
                                     </div>
-                                    <p className={`text-sm mt-1 ${isPro ? 'text-blue-800 dark:text-blue-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                                    <p className="rl-toggle-desc">
                                         {isPro
-                                            ? 'Automatically apply to jobs that match your profile and resume (95-100% match). Save time and never miss an opportunity!'
-                                            : 'Upgrade to Pro to automatically apply to hundreds of matching jobs!'
-                                        }
+                                            ? "Automatically apply to jobs that match your profile and resume. Save time and never miss an opportunity!"
+                                            : "Upgrade to Pro to automatically apply to hundreds of matching jobs!"}
                                     </p>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id="autoApply"
-                                        checked={profile.autoApply}
-                                        disabled={!isPro}
-                                        onChange={(e) => setProfile({ ...profile, autoApply: e.target.checked })}
-                                        className={`w-12 h-6 rounded-full appearance-none cursor-pointer relative transition-colors
-                                                   before:content-[''] before:absolute before:w-5 before:h-5 before:rounded-full before:bg-white
-                                                   before:top-0.5 before:left-0.5 before:transition-transform checked:before:translate-x-6
-                                                   ${isPro ? 'bg-gray-300 checked:bg-blue-600' : 'bg-gray-300 opacity-50 cursor-not-allowed'}`}
-                                    />
-                                </div>
+                                <input
+                                    type="checkbox"
+                                    className="rl-toggle-switch"
+                                    checked={profile.autoApply}
+                                    disabled={!isPro}
+                                    onChange={(e) => setProfile({ ...profile, autoApply: e.target.checked })}
+                                />
                             </div>
                             {!isPro && (
-                                <div className="pt-3 border-t border-amber-200 dark:border-amber-800">
-                                    <Button
+                                <div className="rl-upgrade-banner">
+                                    <button
                                         type="button"
+                                        className="rl-btn-upgrade"
                                         onClick={() => subscribe('PRO', 299)}
                                         disabled={subscribing}
-                                        size="sm"
-                                        className="w-full bg-amber-600 hover:bg-amber-700"
                                     >
-                                        <Crown className="h-3 w-3 mr-1" />
+                                        <Crown size={14} />
                                         {subscribing ? 'Processing...' : 'Upgrade to Pro - ৳299/month'}
-                                    </Button>
+                                    </button>
                                 </div>
                             )}
                             {isPro && profile.autoApply && (
-                                <>
-                                    <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900 p-2 rounded">
-                                        ✓ Auto-apply is enabled. We'll apply to matching jobs on your behalf using your default resume.
-                                    </div>
-
-                                    {/* Match Threshold Slider */}
-                                    <div className="mt-4">
-                                        <Label htmlFor="matchThreshold" className="block text-sm font-medium text-gray-700 dark:text-gray-200">Match Threshold (%)</Label>
-                                        <div className="flex items-center space-x-2 mt-1">
-                                            <input
-                                                id="matchThreshold"
-                                                type="range"
-                                                min={0}
-                                                max={100}
-                                                step={1}
-                                                value={profile.matchThreshold}
-                                                onChange={(e) => setProfile({ ...profile, matchThreshold: Number(e.target.value) })}
-                                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600"
-                                            />
-                                            <span className="w-12 text-center text-sm">{profile.matchThreshold}%</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Auto-Apply Country Select (shown when auto-apply is enabled) */}
-                                    <div className="mt-4">
-                                        <Label htmlFor="autoApplyCountry" className="block text-sm font-medium text-gray-700 dark:text-gray-200">Apply To Country</Label>
-                                        <CountrySelect
-                                            value={profile.autoApplyCountry}
-                                            onValueChange={(value) => setProfile({ ...profile, autoApplyCountry: value })}
-                                            placeholder="Select country"
-                                            className="mt-1"
-                                        />
-                                    </div>
-                                </>
+                                <div style={{
+                                    marginTop: 16,
+                                    fontSize: 12,
+                                    color: "#1e40af",
+                                    background: "#dbeafe",
+                                    padding: "10px 14px",
+                                    borderRadius: 10,
+                                }}>
+                                    ✓ Auto-apply is enabled. We'll apply to matching jobs on your behalf using your default resume.
+                                </div>
                             )}
                         </div>
 
-                        <Button type="submit" disabled={saving} className="w-full">
+                        <button type="submit" className="rl-btn-save" disabled={saving}>
                             {saving ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
                                     Saving...
                                 </>
                             ) : (
                                 <>
-                                    <Save className="mr-2 h-4 w-4" />
+                                    <Save size={16} />
                                     Save Changes
                                 </>
                             )}
-                        </Button>
+                        </button>
                     </form>
-                </CardContent>
-            </Card>
-        </div>
+                </div>
+
+                {/* Danger Zone */}
+                <div className="rl-danger-card">
+                    <h2 className="rl-danger-title">Danger Zone</h2>
+                    <p className="rl-danger-desc">
+                        Once you delete your account, there is no going back. Please be certain.
+                    </p>
+                    <button className="rl-btn-danger">
+                        <Trash2 size={14} />
+                        Delete Account
+                    </button>
+                </div>
+            </div>
+        </>
     );
 }

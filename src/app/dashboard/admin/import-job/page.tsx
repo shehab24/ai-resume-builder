@@ -46,12 +46,20 @@ function AdminImportJobContent() {
         fetchSources();
     }, []);
 
+    // Pre-fill sourceId from query param if present
+    useEffect(() => {
+        const sourceId = searchParams.get("sourceId");
+        if (sourceId) {
+            setFormData(prev => ({ ...prev, sourceId }));
+        }
+    }, [searchParams]);
+
     const fetchSources = async () => {
         try {
             const res = await fetch("/api/admin/job-sources");
             if (!res.ok) throw new Error("Failed to fetch sources");
             const data = await res.json();
-            setSources(data.sources || []);
+            setSources(Array.isArray(data) ? data : data.sources || []);
         } catch (error) {
             console.error(error);
             toast.error("Failed to load job sources");
@@ -120,7 +128,7 @@ function AdminImportJobContent() {
 
             const data = await res.json();
             toast.success("Job imported successfully!");
-            router.push("/dashboard/admin/imported-jobs");
+            router.push("/dashboard/admin/jobs");
         } catch (error) {
             console.error(error);
             toast.error("Failed to import job");

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Plus, ExternalLink, Trash2, Globe, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, Plus, ExternalLink, Trash2, Globe, CheckCircle, XCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 
 interface JobSource {
@@ -30,6 +30,7 @@ export default function AdminJobSourcesPage() {
     const [loading, setLoading] = useState(true);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [fetchingJobs, setFetchingJobs] = useState<string | null>(null);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -117,6 +118,28 @@ export default function AdminJobSourcesPage() {
         }
     };
 
+    const handleFetchJobs = async (sourceId?: string) => {
+        setFetchingJobs(sourceId || "all");
+        try {
+            const res = await fetch("/api/admin/job-sources/scrape", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(sourceId ? { sourceId } : {}),
+            });
+
+            if (!res.ok) throw new Error("Failed to fetch jobs");
+            
+            const data = await res.json();
+            toast.success(data.message);
+            fetchSources();
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to fetch jobs from source(s)");
+        } finally {
+            setFetchingJobs(null);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex justify-center items-center min-h-screen">
@@ -135,13 +158,23 @@ export default function AdminJobSourcesPage() {
                     </p>
                 </div>
 
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button size="lg">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Source
-                        </Button>
-                    </DialogTrigger>
+                <div className="flex items-center gap-3">
+                    <Button 
+                        variant="secondary" 
+                        size="lg" 
+                        onClick={() => handleFetchJobs()}
+                        disabled={fetchingJobs === "all"}
+                    >
+                        {fetchingJobs === "all" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        Fetch All New Jobs
+                    </Button>
+                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button size="lg">
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add Source
+                            </Button>
+                        </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Add New Job Source</DialogTitle>
@@ -187,6 +220,7 @@ export default function AdminJobSourcesPage() {
                         </form>
                     </DialogContent>
                 </Dialog>
+                </div>
             </div>
 
             {/* Sources Grid */}
@@ -244,12 +278,22 @@ export default function AdminJobSourcesPage() {
 
                             <div className="flex gap-2 pt-2">
                                 <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1"
+                                    onClick={() => handleFetchJobs(source.id)}
+                                    disabled={fetchingJobs === source.id || !source.isActive}
+                                >
+                                    {fetchingJobs === source.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Download className="h-3 w-3 mr-1" />} 
+                                    Fetch Jobs
+                                </Button>
+                                <Button
                                     variant="default"
                                     size="sm"
                                     className="flex-1 bg-blue-600 hover:bg-blue-700"
                                     onClick={() => window.location.href = `/dashboard/admin/import-job?sourceId=${source.id}`}
                                 >
-                                    <Plus className="h-3 w-3 mr-1" /> Import Job
+                                    <Plus className="h-3 w-3 mr-1" /> Import Manual
                                 </Button>
                             </div>
                             <div className="flex gap-2">

@@ -21,7 +21,8 @@ export default async function JobSeekerDashboard() {
         }
     });
 
-    const subscription = user?.subscriptions[0];
+    const subscription = user?.subscriptions?.[0];
+
 
     return (
         <div className="space-y-6">

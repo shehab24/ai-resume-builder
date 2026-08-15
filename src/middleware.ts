@@ -5,8 +5,18 @@ const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/resume-builder(.*)',
+  '/create-resume(.*)',
+  '/dashboard/job-seeker/resume/create(.*)',
+  '/api/resume/preview(.*)',
+  '/api/job-suggestions(.*)',
+  '/api/ai/generate-experience(.*)',
+  '/api/ai/suggest-skills(.*)',
   '/payment(.*)',
   '/webhooks(.*)',
+  // Extension auth & API — auth is handled inside each route via auth()
+  '/extension(.*)',
+  '/api/extension(.*)',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
